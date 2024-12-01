@@ -15,6 +15,9 @@ void aes_encrypt_file(const std::string &in_path, const std::string &out_path,
                       const std::vector<unsigned char> &key,
                       const std::vector<unsigned char> &iv);
 
+void aes_decrypt_file(const std::string &in_path, const std::string &out_path,
+                      const std::vector<unsigned char> &key);
+
 } // end namespace soteria
 
 #endif // SOTERIA_ENCRYPTION_AES_H

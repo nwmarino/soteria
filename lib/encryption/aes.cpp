@@ -52,11 +52,11 @@ void soteria::aes_encrypt_file(const std::string &in_path,
 
   EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
   if (!ctx)
-    cli::fatal("failed to create EVP context");
+    cli::fatal("failed to create EVP context for file: " + in_path);
 
   if (!EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, 
       key.data(), iv.data())) {
-    cli::fatal("failed to initialize encryption");
+    cli::fatal("failed to initialize encryption for file: " + in_path);
   }
 
   while (in_file) {
@@ -66,7 +66,7 @@ void soteria::aes_encrypt_file(const std::string &in_path,
     if (bytes_read > 0) {
       if (!EVP_EncryptUpdate(ctx, enc_buffer.data(), &len,
           buffer.data(), bytes_read)) {
-        cli::fatal("failed to encrypt data");
+        cli::fatal("failed to encrypt data for file: " + in_path);
       }
 
       out_file.write(reinterpret_cast<const char *>(enc_buffer.data()), len);
@@ -77,5 +77,60 @@ void soteria::aes_encrypt_file(const std::string &in_path,
     cli::fatal("failed to finalize encryption");
 
   out_file.write(reinterpret_cast<const char *>(enc_buffer.data()), len);
+  EVP_CIPHER_CTX_free(ctx);
+}
+
+void soteria::aes_decrypt_file(const std::string &in_path, 
+                               const std::string &out_path,
+                               const std::vector<unsigned char> &key) {
+  const std::size_t chunk_size = 4096;
+  const std::size_t iv_size = AES_BLOCK_SIZE;
+
+  std::ifstream in_file(in_path, std::ios::binary);
+  std::ofstream out_file(out_path, std::ios::binary);
+
+  if (!in_file)
+    cli::fatal("unable to open input file: " + in_path);
+
+  if (!out_file)
+    cli::fatal("unable to open output file: " + out_path);
+
+  std::vector<unsigned char> iv(iv_size);
+  in_file.read(reinterpret_cast<char *>(iv.data()), iv_size);
+  if (in_file.gcount() != static_cast<std::streamsize>(iv_size))
+    cli::fatal("could not read IV from input file: " + in_path);
+
+  std::vector<unsigned char> buffer(chunk_size + AES_BLOCK_SIZE);
+  std::vector<unsigned char> dec_buffer(chunk_size);
+  int len = 0;
+
+  EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+  if (!ctx)
+    cli::fatal("failed to create EVP context for file: " + in_path);
+
+  if (!EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, 
+      key.data(), iv.data())) {
+    cli::fatal("failed to initialize decryption for file: " + in_path);
+  }
+
+  while (in_file) {
+    in_file.read(reinterpret_cast<char *>(buffer.data()), buffer.size());
+    std::streamsize bytes_read = in_file.gcount();
+
+    if (bytes_read > 0) {
+      if (!EVP_DecryptUpdate(ctx, dec_buffer.data(), &len,
+          buffer.data(), bytes_read)) {
+        cli::fatal("failed to decrypt data for file: " + in_path);
+      }
+
+      out_file.write(reinterpret_cast<const char *>(dec_buffer.data()), len);
+    }
+  }
+
+  if (!EVP_DecryptFinal_ex(ctx, dec_buffer.data(), &len))
+    cli::fatal("failed to finalize decryption for file: " + in_path);
+
+  out_file.write(reinterpret_cast<const char *>(dec_buffer.data()), len);
+
   EVP_CIPHER_CTX_free(ctx);
 }

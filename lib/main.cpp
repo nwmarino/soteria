@@ -2,6 +2,7 @@
 //
 //>==----------------------------------------------------------------------==<//
 
+#include <algorithm>
 #include <string>
 
 #include "../include/cli/cli.h"
@@ -17,6 +18,10 @@ int main(int argc, char *argv[]) {
   generate_key_iv(key, iv);
 
   aes_encrypt_file(argv[1], argv[2], key, iv);
+
+  const std::string dec_out = "decrypted_" + std::string(argv[2]).substr(std::string(argv[2]).find_last_of('/') + 1);
+
+  aes_decrypt_file(argv[2], dec_out, key);
   
   return 0;
 }
