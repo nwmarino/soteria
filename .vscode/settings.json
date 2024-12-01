@@ -73,5 +73,12 @@
         "cinttypes": "cpp",
         "typeinfo": "cpp",
         "variant": "cpp"
+    },
+    "cmake.debugConfig": {
+        "args": [
+            "MyContainer",
+            "load",
+            "tests/cl/plain1.txt",
+        ]
     }
 }

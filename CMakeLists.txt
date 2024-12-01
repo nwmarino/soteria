@@ -14,6 +14,11 @@ target_include_directories(soteria_cli
         ${INCLUDE_DIR}/cli
 )
 
+target_include_directories(soteria_container
+    PUBLIC
+        ${INCLUDE_DIR}/container
+)
+
 target_include_directories(soteria_encryption
     PUBLIC
         ${INCLUDE_DIR}/encryption
@@ -28,5 +33,6 @@ target_link_libraries(soteria
         OpenSSL::Crypto
         OpenSSL::SSL
         soteria_cli
+        soteria_container
         soteria_encryption
 )
