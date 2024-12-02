@@ -1,18 +1,21 @@
-//>==- aes.cpp ------------------------------------------------------------==<//
+//>==- encryption.cpp -----------------------------------------------------==<//
 //
 //>==----------------------------------------------------------------------==<//
 
 #include <fstream>
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
 #include "openssl/aes.h"
-#include "openssl/rand.h"
 #include "openssl/evp.h"
+#include "openssl/rand.h"
+#include "openssl/sha.h"
 
-#include "../../include/encryption/aes.h"
 #include "../../include/cli/cli.h"
+#include "../../include/utils/encryption.h"
 
 using namespace soteria;
 
@@ -26,6 +29,19 @@ void soteria::generate_key_iv(std::vector<unsigned char> &key,
       || !RAND_bytes(iv.data(), iv_len)) {
     cli::fatal("failed to generate key");
   }
+}
+
+const std::string soteria::generate_sha256(const std::vector<unsigned char> &data) {
+  unsigned char hash[SHA256_DIGEST_LENGTH];
+  SHA256(data.data(), data.size(), hash);
+
+  std::ostringstream oss;
+  for (unsigned i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
+    oss << std::hex << std::setw(2) << std::setfill('0')
+        << static_cast<int>(hash[i]);
+  }
+
+  return oss.str();
 }
 
 void soteria::aes_encrypt_file(const std::string &in_path, 

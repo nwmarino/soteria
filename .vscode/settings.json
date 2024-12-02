@@ -72,13 +72,16 @@
         "thread": "cpp",
         "cinttypes": "cpp",
         "typeinfo": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "source_location": "cpp",
+        "shared_mutex": "cpp",
+        "valarray": "cpp"
     },
     "cmake.debugConfig": {
         "args": [
             "MyContainer",
-            "load",
-            "tests/cl/plain1.txt",
+            "store",
+            "test.txt",
         ]
     }
 }

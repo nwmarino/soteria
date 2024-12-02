@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.20.0)
 set(CMAKE_CXX_STANDARD 20)
 project(soteria)
 
+cmake_policy(SET CMP0167 NEW)
+find_package(Boost REQUIRED COMPONENTS filesystem program_options iostreams)
 find_package(OpenSSL REQUIRED)
 
 add_subdirectory(lib)
@@ -14,25 +16,27 @@ target_include_directories(soteria_cli
         ${INCLUDE_DIR}/cli
 )
 
-target_include_directories(soteria_container
+target_include_directories(soteria_core
     PUBLIC
-        ${INCLUDE_DIR}/container
+        ${INCLUDE_DIR}/core
 )
 
-target_include_directories(soteria_encryption
+target_include_directories(soteria_utils
     PUBLIC
-        ${INCLUDE_DIR}/encryption
+        ${INCLUDE_DIR}/utils
 )
 
 add_executable(soteria lib/main.cpp)
 
+include_directories(${Boost_INCLUDE_DIRS})
 include_directories(${INCLUDE_DIR})
 
 target_link_libraries(soteria
     PRIVATE
+        ${Boost_LIBRARIES}
         OpenSSL::Crypto
         OpenSSL::SSL
         soteria_cli
-        soteria_container
-        soteria_encryption
+        soteria_core
+        soteria_utils
 )

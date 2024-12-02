@@ -11,6 +11,7 @@
 
 namespace soteria {
 
+/// Represents a container file instance.
 class Container {
   /// The name of the container.
   const std::string name;
@@ -19,7 +20,7 @@ class Container {
   const std::string path;
 
   /// The file stream for the container file.
-  std::fstream container;
+  mutable std::fstream container;
 
   /// Private constructor for pre-existing container representation.
   /// \param path The path to the container.

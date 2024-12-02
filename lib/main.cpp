@@ -7,7 +7,7 @@
 #include <string>
 
 #include "../include/cli/cli.h"
-#include "../include/container/container.h"
+#include "../include/core/container.h"
 #include "../include/encryption/aes.h"
 
 using namespace soteria;
@@ -42,9 +42,9 @@ int main(int argc, char **argv) {
     nextArg(&argc, &argv);
     container_name = argv[0];
     make_new = true;  
-  } else if (strcmp("del", argv[0]) == 0) {
+  } else if (strcmp("rm", argv[0]) == 0) {
     if (argc != 2)
-      cli::fatal("usage: soteria del <container>");
+      cli::fatal("usage: soteria rm <container>");
 
     if (remove(argv[1]) != 0)
       cli::fatal("failed to delete container: " + std::string(argv[1]));

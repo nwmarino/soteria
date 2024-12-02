@@ -4,21 +4,28 @@
 
 #include <cstdint>
 #include <iostream>
-#include <openssl/aes.h>
-#include <openssl/rand.h>
 #include <string>
 #include <vector>
 
+#include "boost/filesystem.hpp"
+#include "openssl/aes.h"
+#include "openssl/rand.h"
+
 #include "../../include/cli/cli.h"
-#include "../../include/container/container.h"
-#include "../../include/encryption/aes.h"
+#include "../../include/core/container.h"
+
+namespace fs = boost::filesystem;
 
 using namespace soteria;
 
 Container::Container(const std::string &path) 
     : path(path), name(path.substr(path.find_last_of('/') + 1)) {
-  container.open(this->path, std::ios::binary | std::ios::in | std::ios::out);
-  if (!container)
+  container.open(
+    this->path,
+    std::ios::binary | std::ios::in | std::ios::out
+  );
+
+  if (!fs::exists(path))
     cli::fatal("unable to open container: " + name);
 }
 
@@ -26,21 +33,27 @@ Container::Container(const std::string &name,
                      const std::string &path,
                      std::size_t size) : name(name), path(path) {
   container.open(
-    this->path, 
+    this->path,
     std::ios::binary | std::ios::in | std::ios::out | std::ios::trunc
   );
 
-  if (!container)
+  if (!fs::exists(path))
     cli::fatal("unable to create container: " + name);
 
+  // Write empty data to the container.
   std::vector<unsigned char> empty_data(size, 0);
   container.write(reinterpret_cast<const char *>(empty_data.data()), size);
 }
 
 Container::~Container() { container.close(); }
 
-Container *Container::create(const std::string &path, std::size_t size) 
-{ return new Container("container", path, size); }
+Container *Container::create(const std::string &path, std::size_t size) { 
+  return new Container(
+    path.substr(path.find_last_of('/') + 1), 
+    path, 
+    size
+  );
+}
 
 Container *Container::open(const std::string &path) 
 { return new Container(path); }
@@ -53,18 +66,15 @@ void Container::store_file(const std::string &in_path,
   if (!RAND_bytes(iv.data(), iv_size))
     cli::fatal("failed to generate IV for file: " + in_path);
 
-
   // Open the input file.
   std::ifstream in_file(in_path, std::ios::binary);
   if (!in_file)
     cli::fatal("unable to open file: " + in_path);
 
-
   // Get the file size.
   in_file.seekg(0, std::ios::end);
   std::uint64_t file_size = in_file.tellg();
   in_file.seekg(0, std::ios::beg);
-
 
   // Write file metadata.
   std::uint32_t filename_len = in_path.size();
@@ -89,7 +99,7 @@ void Container::store_file(const std::string &in_path,
 
   std::uint64_t enc_size = 0;
   std::streampos size_pos = container.tellp();
-  container.write(reinterpret_cast<const char*>(&enc_size), sizeof(enc_size));
+  container.write(reinterpret_cast<const char *>(&enc_size), sizeof(enc_size));
 
   while (in_file) {
     in_file.read(reinterpret_cast<char *>(buffer.data()), buffer.size());
@@ -114,7 +124,7 @@ void Container::store_file(const std::string &in_path,
 
   std::streampos current_pos = container.tellp();
   container.seekp(size_pos, std::ios::beg);
-  container.write(reinterpret_cast<const char*>(&enc_size), sizeof(enc_size));
+  container.write(reinterpret_cast<const char *>(&enc_size), sizeof(enc_size));
   container.seekp(current_pos, std::ios::beg);
 
   EVP_CIPHER_CTX_free(ctx);
