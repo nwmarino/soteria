@@ -19,16 +19,12 @@
 
 using namespace soteria;
 
-void soteria::generate_key_iv(std::vector<unsigned char> &key, 
-                            std::vector<unsigned char> &iv,
-                            std::size_t key_len, std::size_t iv_len) {
-  key.resize(key_len);
-  iv.resize(iv_len);
+std::vector<unsigned char> soteria::generate_rand(const std::size_t) {
+  std::vector<unsigned char> rand(32);
+  if (!RAND_bytes(rand.data(), rand.size()))
+    cli::fatal("failed to generate random bytes");
 
-  if (!RAND_bytes(key.data(), key_len) 
-      || !RAND_bytes(iv.data(), iv_len)) {
-    cli::fatal("failed to generate key");
-  }
+  return rand;
 }
 
 const std::string soteria::generate_sha256(const std::vector<unsigned char> &data) {
@@ -44,109 +40,125 @@ const std::string soteria::generate_sha256(const std::vector<unsigned char> &dat
   return oss.str();
 }
 
-void soteria::aes_encrypt_file(const std::string &in_path, 
-                               const std::string &out_path,
-                               const std::vector<unsigned char> &key,
-                               const std::vector<unsigned char> &iv) {
-  const std::size_t chunk_size = 4096;
-  std::ifstream in_file(in_path, std::ios::binary);
-  std::ofstream out_file(out_path, std::ios::binary);
+std::vector<unsigned char>
+soteria::aes_encrypt(const std::vector<unsigned char> &data,
+                     const std::vector<unsigned char> &key,
+                     const std::vector<unsigned char> &iv) {
+  // Validate key, iv sizes for AES-256.
+  if (key.size() != 32) 
+    cli::fatal("invalid key size: " + std::to_string(key.size()));
+  if (iv.size() != AES_BLOCK_SIZE)
+    cli::fatal("invalid iv size: " + std::to_string(iv.size()));
 
-  // Check that the I/o files could be opened.
-  if (!in_file)
-    cli::fatal("unable to open input file: " + in_path);
-
-  if (!out_file)
-    cli::fatal("unable to open output file: " + out_path);
-
-  // Begin the output file with the IV.
-  out_file.write(reinterpret_cast<const char *>(iv.data()), iv.size());
-
-  std::vector<unsigned char> buffer(chunk_size);
-  std::vector<unsigned char> enc_buffer(chunk_size + AES_BLOCK_SIZE);
-  int len = 0;
-
+  // Initialize cipher context.
   EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
   if (!ctx)
-    cli::fatal("failed to create EVP context for file: " + in_path);
+    cli::fatal("context creation EVP_CIPHER_CTX failed for encryption");
 
+  // Attempt to initialize encryption.
   if (!EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, 
       key.data(), iv.data())) {
-    cli::fatal("failed to initialize encryption for file: " + in_path);
+    EVP_CIPHER_CTX_free(ctx);
+    cli::fatal("encryption initialization EVP_EncryptInit_ex failed");
   }
 
-  while (in_file) {
-    in_file.read(reinterpret_cast<char *>(buffer.data()), buffer.size());
-    std::streamsize bytes_read = in_file.gcount();
+  // Initialize ciphertext buffer to read into.
+  std::vector<unsigned char> ciphertext(data.size() 
+      + EVP_CIPHER_block_size(EVP_aes_256_cbc()));
+  int len = 0, ciphertext_len = 0;
 
-    if (bytes_read > 0) {
-      if (!EVP_EncryptUpdate(ctx, enc_buffer.data(), &len,
-          buffer.data(), bytes_read)) {
-        cli::fatal("failed to encrypt data for file: " + in_path);
-      }
-
-      out_file.write(reinterpret_cast<const char *>(enc_buffer.data()), len);
-    }
+  // Attempt to encrypt data.
+  if (!EVP_EncryptUpdate(ctx, ciphertext.data(), &len, 
+      data.data(), data.size())) {
+    EVP_CIPHER_CTX_free(ctx);
+    cli::fatal("encryption update EVP_EncryptUpdate failed");
   }
+  ciphertext_len = len;
 
-  if (!EVP_EncryptFinal_ex(ctx, enc_buffer.data(), &len))
-    cli::fatal("failed to finalize encryption");
+  // Attempt to finalize encryption.
+  if (!EVP_EncryptFinal_ex(ctx, ciphertext.data() + len, &len)) {
+    EVP_CIPHER_CTX_free(ctx);
+    cli::fatal("encryption finalization EVP_EncryptFinal_ex failed");
+  }
+  ciphertext_len += len;
 
-  out_file.write(reinterpret_cast<const char *>(enc_buffer.data()), len);
+  // Resize ciphertext buffer to actual read size.
+  ciphertext.resize(ciphertext_len);
   EVP_CIPHER_CTX_free(ctx);
+  return ciphertext;
 }
 
-void soteria::aes_decrypt_file(const std::string &in_path, 
-                               const std::string &out_path,
-                               const std::vector<unsigned char> &key) {
-  const std::size_t chunk_size = 4096;
-  const std::size_t iv_size = AES_BLOCK_SIZE;
+std::vector<unsigned char> 
+soteria::aes_decrypt(const std::vector<unsigned char> &data,
+                     const std::vector<unsigned char> &key,
+                     const std::vector<unsigned char> &iv) {
+  // Validate key, iv sizes for AES-256.
+  if (key.size() != 32) 
+    cli::fatal("invalid key size: " + std::to_string(key.size()));
+  if (iv.size() != AES_BLOCK_SIZE)
+    cli::fatal("invalid iv size: " + std::to_string(iv.size()));
 
-  std::ifstream in_file(in_path, std::ios::binary);
-  std::ofstream out_file(out_path, std::ios::binary);
-
-  if (!in_file)
-    cli::fatal("unable to open input file: " + in_path);
-
-  if (!out_file)
-    cli::fatal("unable to open output file: " + out_path);
-
-  std::vector<unsigned char> iv(iv_size);
-  in_file.read(reinterpret_cast<char *>(iv.data()), iv_size);
-  if (in_file.gcount() != static_cast<std::streamsize>(iv_size))
-    cli::fatal("could not read IV from input file: " + in_path);
-
-  std::vector<unsigned char> buffer(chunk_size + AES_BLOCK_SIZE);
-  std::vector<unsigned char> dec_buffer(chunk_size);
-  int len = 0;
-
+  // Initialize cipher context.
   EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
   if (!ctx)
-    cli::fatal("failed to create EVP context for file: " + in_path);
+    cli::fatal("context creation EVP_CIPHER_CTX failed for decryption");
 
   if (!EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, 
       key.data(), iv.data())) {
-    cli::fatal("failed to initialize decryption for file: " + in_path);
+    EVP_CIPHER_CTX_free(ctx);
+    cli::fatal("encryption initialization EVP_DecryptInit_ex failed");
   }
 
-  while (in_file) {
-    in_file.read(reinterpret_cast<char *>(buffer.data()), buffer.size());
-    std::streamsize bytes_read = in_file.gcount();
+  /// Initialize plaintext buffer to read into.
+  std::vector<unsigned char> plaintext(data.size());
+  int len = 0, plaintext_len = 0;
 
-    if (bytes_read > 0) {
-      if (!EVP_DecryptUpdate(ctx, dec_buffer.data(), &len,
-          buffer.data(), bytes_read)) {
-        cli::fatal("failed to decrypt data for file: " + in_path);
-      }
-
-      out_file.write(reinterpret_cast<const char *>(dec_buffer.data()), len);
-    }
+  // Attempt to decrypt data.
+  if (!EVP_DecryptUpdate(ctx, plaintext.data(), &len, 
+      data.data(), data.size())) {
+    EVP_CIPHER_CTX_free(ctx);
+    cli::fatal("encryption update EVP_DecryptUpdate failed");
   }
+  plaintext_len = len;
 
-  if (!EVP_DecryptFinal_ex(ctx, dec_buffer.data(), &len))
-    cli::fatal("failed to finalize decryption for file: " + in_path);
+  // Attempt to finalize decryption.
+  if (EVP_DecryptFinal_ex(ctx, plaintext.data() + len, &len) != 1) {
+    EVP_CIPHER_CTX_free(ctx);
+    cli::fatal("encryption finalization EVP_DecryptFinal_ex failed");
+  }
+  plaintext_len += len;
 
-  out_file.write(reinterpret_cast<const char *>(dec_buffer.data()), len);
-
+  // Resize plaintext buffer to actual read size.
+  plaintext.resize(plaintext_len);
   EVP_CIPHER_CTX_free(ctx);
+  return plaintext;
+}
+
+std::vector<unsigned char> 
+soteria::hash_password(const std::string &data,
+                       const std::vector<unsigned char> &salt,
+                       const unsigned int iterations,
+                       const unsigned int len) {
+  std::vector<unsigned char> hash(len);
+
+  // Attempt to hash the data.
+  if (!PKCS5_PBKDF2_HMAC(data.c_str(), data.size(), salt.data(), salt.size(),
+      iterations, EVP_sha256(), len, hash.data())) {
+    cli::fatal("failed to hash password");
+  }
+
+  return hash;
+}
+
+bool soteria::match_password(const std::string &stored, 
+                             const std::string &password,
+                             const std::vector<unsigned char> &salt) {
+  // Hash the input password.
+  std::vector<unsigned char> hashed_password = hash_password(password, salt);
+
+  // Compare the stored password with the input password.
+  return stored == std::string(
+    hashed_password.begin(), 
+    hashed_password.end()
+  );
 }

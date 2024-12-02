@@ -75,7 +75,8 @@
         "variant": "cpp",
         "source_location": "cpp",
         "shared_mutex": "cpp",
-        "valarray": "cpp"
+        "valarray": "cpp",
+        "hash_set": "cpp"
     },
     "cmake.debugConfig": {
         "args": [

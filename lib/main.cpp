@@ -3,12 +3,11 @@
 //>==----------------------------------------------------------------------==<//
 
 #include <cstring>
-#include <iostream>
 #include <string>
 
 #include "../include/cli/cli.h"
 #include "../include/core/container.h"
-#include "../include/encryption/aes.h"
+#include "../include/utils/encryption.h"
 
 using namespace soteria;
 

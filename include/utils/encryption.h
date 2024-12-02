@@ -6,21 +6,46 @@
 
 namespace soteria {
 
-void generate_key_iv(std::vector<unsigned char> &key, 
-                     std::vector<unsigned char> &iv,
-                     std::size_t key_len = 32,
-                     std::size_t iv_len = 16);
+/// \returns A random byte array.
+/// \param len The length of the byte array.
+std::vector<unsigned char> generate_rand(const std::size_t len = 32);
 
 /// \returns The SHA-256 hash of \p data.
 /// \param data The data to hash.
 const std::string generate_sha256(const std::vector<unsigned char> &data);
 
-void aes_encrypt_file(const std::string &in_path, const std::string &out_path,
-                      const std::vector<unsigned char> &key,
-                      const std::vector<unsigned char> &iv);
+/// \returns AES-256-CBC encrypted data.
+/// \param data The data to encrypt.
+/// \param key The encryption key.
+/// \param iv The initialization vector.
+std::vector<unsigned char> aes_encrypt(const std::vector<unsigned char> &data,
+                                       const std::vector<unsigned char> &key,
+                                       const std::vector<unsigned char> &iv);
 
-void aes_decrypt_file(const std::string &in_path, const std::string &out_path,
-                      const std::vector<unsigned char> &key);
+/// \returns AES-256-CBC decrypted data.
+/// \param data The data to decrypt.
+/// \param key The decryption key.
+/// \param iv The initialization vector.
+std::vector<unsigned char> aes_decrypt(const std::vector<unsigned char> &data,
+                                       const std::vector<unsigned char> &key,
+                                       const std::vector<unsigned char> &iv);
+
+/// \returns A hashed password.
+/// \param data The password to hash.
+/// \param salt The salt to use.
+/// \param iterations The number of iterations to hash.
+/// \param len The length of the hash.
+std::vector<unsigned char> hash_password(const std::string &data,
+                                         const std::vector<unsigned char> &salt,
+                                         const unsigned int iterations = 100000,
+                                         const unsigned int len = 32);
+
+/// \returns Matches the stored password with the input password.
+/// \param stored The stored password hash.
+/// \param password The input password.
+/// \param salt The salt used to hash the password.
+bool match_password(const std::string &stored, const std::string &password,
+                    const std::vector<unsigned char> &salt);
 
 } // end namespace soteria
 

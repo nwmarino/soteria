@@ -16,8 +16,14 @@ struct FATEntry {
   /// Name of the file.
   std::string filename;
 
-  /// Length of the file.
+  /// Original size of the file contents.
   uint64_t size;
+
+  /// Compressed size of the file contents.
+  uint64_t compressed_size;
+
+  /// Encrypted size of the file contents.
+  uint64_t enc_size;
 
   /// Offset of the file in the container.
   uint64_t offset;
