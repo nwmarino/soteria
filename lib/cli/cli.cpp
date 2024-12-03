@@ -3,6 +3,7 @@
 //>==----------------------------------------------------------------------==<//
 
 #include <boost/program_options/options_description.hpp>
+#include <boost/program_options/positional_options.hpp>
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -57,9 +58,26 @@ using namespace soteria;
       "log the container audit log to a file"
     );
 
+  bpo::options_description positional_desc("Positional options:");
+  positional_desc.add_options()
+    (
+      "container",
+      bpo::value<std::string>(&opts.container),
+      "path to the container"
+    );
+  
+  bpo::positional_options_description positional;
+  positional.add("container", 1);
+
   bpo::variables_map vmap;
   try {
-    bpo::store(bpo::parse_command_line(argc, argv, desc), vmap);
+    bpo::store(
+      bpo::command_line_parser(argc, argv)
+              .options(desc.add(positional_desc))
+              .positional(positional)
+              .run(),
+      vmap
+    );
     bpo::notify(vmap);
 
     // If help is requested, print the help message and exit.
@@ -109,12 +127,15 @@ using namespace soteria;
       command_count++;
       opts.command = Cmd::Log;
     }
-
-    if (command_count == 0)
-      cli::fatal("err: no command specified");
-
-    if (command_count > 1)
+    
+    if (command_count == 0) {
+      if (!vmap.count("container"))
+        cli::fatal("err: no container specified");
+    }
+    else if (command_count > 1)
       cli::fatal("err: multiple commands specified");
+    else if ((opts.command != Cmd::Make && opts.command != Cmd::Remove) && !vmap.count("container"))
+      cli::fatal("err: no container specified");
 
   } catch (const bpo::error& ex) {
     std::cerr << "argument parsing error: " << ex.what() << std::endl;

@@ -5,40 +5,41 @@
 #ifndef SOTERIA_FAT_H
 #define SOTERIA_FAT_H
 
+#include <array>
 #include <cstdint>
 #include <ctime>
 #include <string>
-#include <vector>
 
 namespace soteria {
 
+/// File Allocation Table metadata for a file entry.
 struct FATEntry {
   /// Name of the file.
   std::string filename;
 
   /// Original size of the file contents.
-  uint64_t size;
-
-  /// Compressed size of the file contents.
-  uint64_t compressed_size;
+  std::uint64_t original_size;
 
   /// Encrypted size of the file contents.
-  uint64_t enc_size;
+  std::uint64_t encrypted_size;
+
+  /// Compressed size of the file contents.
+  std::uint64_t compressed_size;
 
   /// Offset of the file in the container.
-  uint64_t offset;
+  std::uint64_t offset;
 
-  /// IV for the file.
-  std::vector<unsigned char> iv;
-
-  /// Whether the file is compressed.
+  /// If true, then the file is compressed.
   bool is_compressed : 1;
 
   /// Most recent modification timestamp.
   std::time_t last_modified;
 
+  /// Initialization vector for the file.
+  std::array<unsigned char, 16> iv;
+
   /// SHA-256 checksum of the file.
-  std::string checksum; 
+  std::array<unsigned char, 32> checksum; 
 };
 
 /// \returns A FATEntry with file metadata at \p file_path.

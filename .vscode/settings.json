@@ -83,9 +83,10 @@
     },
     "cmake.debugConfig": {
         "args": [
-            "MyContainer",
-            "store",
-            "test.txt",
+            "--mk",
+            "C",
+            "--pw",
+            "hello",
         ]
     }
 }

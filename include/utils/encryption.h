@@ -1,6 +1,7 @@
 #ifndef SOTERIA_ENCRYPTION_AES_H
 #define SOTERIA_ENCRYPTION_AES_H
 
+#include <array>
 #include <string>
 #include <vector>
 
@@ -10,9 +11,9 @@ namespace soteria {
 /// \param len The length of the byte array.
 std::vector<unsigned char> generate_rand(const std::size_t len = 32);
 
-/// \returns The SHA-256 hash of \p data.
-/// \param data The data to hash.
-const std::string generate_sha256(const std::vector<unsigned char> &data);
+/// \returns The SHA-256 hash of the file at \p path.
+/// \param path The path to the file.
+std::array<unsigned char, 32> compute_checksum(const std::string &path);
 
 /// \returns AES-256-CBC encrypted data.
 /// \param data The data to encrypt.
@@ -44,7 +45,8 @@ std::vector<unsigned char> hash_password(const std::string &data,
 /// \param stored The stored password hash.
 /// \param password The input password.
 /// \param salt The salt used to hash the password.
-bool match_password(const std::string &stored, const std::string &password,
+bool match_password(const std::string &password,
+                    const std::vector<unsigned char> &hash,
                     const std::vector<unsigned char> &salt);
 
 } // end namespace soteria

@@ -16,28 +16,34 @@
 
 #include "../../include/cli/cli.h"
 #include "../../include/utils/encryption.h"
+#include "../../include/utils/file.h"
 
 using namespace soteria;
 
-std::vector<unsigned char> soteria::generate_rand(const std::size_t) {
-  std::vector<unsigned char> rand(32);
+std::vector<unsigned char> soteria::generate_rand(const std::size_t len) {
+  std::vector<unsigned char> rand(len);
   if (!RAND_bytes(rand.data(), rand.size()))
     cli::fatal("failed to generate random bytes");
 
   return rand;
 }
 
-const std::string soteria::generate_sha256(const std::vector<unsigned char> &data) {
+std::array<unsigned char, 32> soteria::compute_checksum(const std::string &path) {
+  std::vector<unsigned char> data = gen_read_file(path); // Read the file in.
+  
+  // Hash the data.
   unsigned char hash[SHA256_DIGEST_LENGTH];
   SHA256(data.data(), data.size(), hash);
 
-  std::ostringstream oss;
-  for (unsigned i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
-    oss << std::hex << std::setw(2) << std::setfill('0')
-        << static_cast<int>(hash[i]);
-  }
+  // Copy the hash to a fixed-size array.
+  std::array<unsigned char, 32> checksum;
+  std::copy(
+    hash, 
+    hash + SHA256_DIGEST_LENGTH, 
+    checksum.begin()
+  );
 
-  return oss.str();
+  return checksum;
 }
 
 std::vector<unsigned char>
@@ -150,14 +156,14 @@ soteria::hash_password(const std::string &data,
   return hash;
 }
 
-bool soteria::match_password(const std::string &stored, 
-                             const std::string &password,
+bool soteria::match_password(const std::string &password,
+                             const std::vector<unsigned char> &hash,
                              const std::vector<unsigned char> &salt) {
   // Hash the input password.
   std::vector<unsigned char> hashed_password = hash_password(password, salt);
 
   // Compare the stored password with the input password.
-  return stored == std::string(
+  return std::string(hash.begin(), hash.end()) == std::string(
     hashed_password.begin(), 
     hashed_password.end()
   );

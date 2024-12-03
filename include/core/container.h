@@ -21,11 +21,17 @@ class Container {
   /// The path to the container.
   const std::string path;
 
+  /// The salt used to hash the master password.
+  mutable std::vector<unsigned char> salt;
+
+  /// The hashed master password of the container.
+  mutable std::vector<unsigned char> master;
+
   /// The file stream for the container file.
   mutable std::fstream container;
 
   /// File allocation table.
-  mutable std::vector<FATEntry> fat;
+  mutable std::vector<FATEntry> fat = {};
 
   /// Create a new container representation based on an existing container.
   /// \param path The path to the container.
@@ -57,41 +63,21 @@ public:
   /// \param path The path to the container.
   static Container *open(const std::string &path, const std::string &pass);
 
-  /// Writes data to the container.
-  /// \param file_path The path to the file to write.
-  /// \param data The data to write.
-  void store_file(const std::string &in_path, const std::string &password);
+  /// Writes the current master hash to the container.
+  void store_master();
 
-  /// Attempts to read data from the container. Does not delete it.
-  /// \param target_file The file to read from the container.
-  void load_file(const std::string &out_path, const std::string &password);
+  /// Loads the master hash from the container.
+  void load_master();
 
-  /// Writes the current state of the fat to the container.
-  void write_fat();
+  /// Writes the current state of the FAT to the container.
+  void store_fat();
 
-  /// Reads the fat from the container.
-  void read_fat();
+  /// Loads the current state of the FAT from the container.
+  void load_fat();
 
-  /// \returns The FAT of this container.
-  const std::vector<FATEntry> &get_fat() const { return fat; }
-
-  /// Stores the encryption key in the container.
-  /// \param key The key to store.
-  /// \param password The password to store the key with.
-  void store_key(const std::vector<unsigned char> &key, 
-                 const std::string &password);
-
-  /// \returns The encryption key from the container.
-  /// \param password The password to retrieve the key with.
-  std::vector<unsigned char> load_key(const std::string &password);
-
-  /// Changes the master password of the container.
-  /// \param old_pass The old password.
-  /// \param new_pass The new password.
-  void change_master(const std::string &old_pass, const std::string &new_pass);
-
-  /// \returns The end offset of the container.
-  std::size_t end_offset() const;
+  /// Dumps the container's contents to \p path.
+  /// \param path The path to dump the container to.
+  void list(const std::string &path);
 };
 
 } // end namespace soteria

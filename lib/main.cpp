@@ -29,26 +29,47 @@ static void nextArg(int *argc, char ***argv) {
 int main(int argc, char **argv) {
   cli::CLIOpts opts = cli::parse(argc, argv);
 
-  switch (opts.command) {
-  case cli::Cmd::Make:
-    Container::create(opts.container, opts.password, 1024);
+  if (opts.command == cli::Cmd::Make) {
+    Container *container = Container::create(
+      opts.container, 
+      opts.password, 
+      1024
+    );
+    delete container;
     return EXIT_SUCCESS;
-  case cli::Cmd::Remove:
-    /// TODO: password-protect deletion
+  } else if (opts.command == cli::Cmd::Remove) {
     if (!fs::exists(opts.container))
       cli::fatal("container does not exist");
 
     fs::remove(opts.container.c_str());
     return EXIT_SUCCESS;
-  case cli::Cmd::Store:
-    break;
-  case cli::Cmd::Load:
-    break;
-  case cli::Cmd::List:
-    break;
-  case cli::Cmd::Log:
-    break;
   }
 
+  Container *container = Container::open(
+    opts.container, 
+    opts.password
+  );
+
+  if (opts.command == cli::Cmd::Store) {
+    for(std::string &path : opts.paths) {
+      //container->store_file(path, opts.password);
+    }
+  }
+
+  if (opts.command == cli::Cmd::Load) {
+    for(std::string &path : opts.paths) {
+      //container->load_file(path, opts.password);
+    }
+  }
+
+  if (opts.command == cli::Cmd::List) {
+    container->list("./list.txt");
+  }
+
+  if (opts.command == cli::Cmd::Log) {
+
+  }
+
+  delete container;
   return EXIT_SUCCESS;
 }
