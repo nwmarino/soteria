@@ -6,38 +6,20 @@
 //
 // { FAT }
 // [48 : 52] -> FAT ENTRY COUNT (4-byte)
-// [52 : ?] -> FILE 1 METADATA
-//   [0 : 4] -> FILE NAME LENGTH (4-byte)
-//   [4 : 4 + FILE NAME LENGTH] -> FILE NAME (variable)
-//   [4 + FILE NAME LENGTH : 12 + FILE NAME LENGTH] -> ORIGINAL FILE SIZE (8-byte)
-//   [12 + FILE NAME LENGTH ]
-
-
-
-// [(8 + salt_size + hash_size) - (FAT entry count offset)] -> FAT entry count (4 bytes)
-// [(FAT entry count offset) + 4] -> File 1 metadata:
-//   - File name length (4 bytes)
-//   - File name (variable size)
-//   - Original file size (8 bytes)
-//   - Last modified timestamp (8 bytes)
-//   - Encrypted data offset (8 bytes)
-// [(FAT entry count offset) + 4 + (size of all file metadata)] -> File 2 metadata, etc.
-// 
-// [Encrypted Data]
-// [After FAT] -> Encrypted data for each file (variable size)
-// 
-// [Encryption Key]
-// [After encrypted data] -> Encryption key (variable size)
+// [52 : FAT ENTRIES * 40] -> FAT ENTRIES (40-byte ea.)
 //
 //>==----------------------------------------------------------------------==<//
 
 #include <algorithm>
 #include <cstdint>
+#include <iomanip>
 #include <iostream>
 #include <string>
 #include <vector>
 
 #include "boost/filesystem.hpp"
+#include "boost/iostreams/filtering_stream.hpp"
+#include "boost/iostreams/filter/zlib.hpp"
 
 #include "openssl/aes.h"
 #include "openssl/rand.h"
@@ -49,11 +31,13 @@
 #include "../../include/utils/compression.h"
 #include "../../include/utils/encryption.h"
 #include "../../include/utils/file.h"
-#include <iomanip>
 
 namespace fs = boost::filesystem;
+namespace ios = boost::iostreams;
 
 using namespace soteria;
+
+constexpr std::size_t PBKDF2_ITERATIONS = 100000;
 
 constexpr std::size_t WIDTH_SALT = 16;
 constexpr std::size_t WIDTH_HASH = 32;
@@ -85,6 +69,28 @@ Container::Container(const std::string &path,
     std::fill(master.begin(), master.end(), 0);
     cli::fatal("incorrect password for container: " + name);
   }
+
+  // Derive the encryption key.
+  std::array<unsigned char, 32> derived_tmp;
+  if (!PKCS5_PBKDF2_HMAC(
+    pass.c_str(),
+    pass.length(),
+    salt.data(),
+    WIDTH_SALT,
+    PBKDF2_ITERATIONS,
+    EVP_sha256(),
+    WIDTH_HASH,
+    derived_tmp.data()
+  )) {
+    cli::fatal("failed to derive master key from password");
+  }
+
+  this->key = derived_tmp;
+
+  // Clear the salt, master hash from memory.
+  std::fill(salt.begin(), salt.end(), 0);
+  std::fill(master.begin(), master.end(), 0);
+  std::fill(derived_tmp.begin(), derived_tmp.end(), 0);
 }
 
 /// Create-constructor.
@@ -113,10 +119,18 @@ Container::Container(const std::string &name,
     empty_space.size()
   );
 
+  fat.clear();
   store_fat();
 }
 
-Container::~Container() { container.close(); }
+Container::~Container() {
+  std::fill(salt.begin(), salt.end(), 0);
+  std::fill(master.begin(), master.end(), 0);
+  std::fill(key.begin(), key.end(), 0);
+
+  container.close(); 
+  fat.clear();
+}
 
 Container *Container::create(const std::string &path,
                              const std::string &pass,
@@ -223,15 +237,14 @@ void Container::store_fat() {
     cli::fatal("(store_fat): failed to write FAT entry count to container: " + name);
   }
 
+  std::ostringstream fat_stream;
+  for (const FATEntry &entry : fat)
+    serialize(fat_stream, entry);
+  const std::string serialized_fat = fat_stream.str();
+
   // Serialize each entry.
-  for (const FATEntry &entry : this->fat) {
-    if (!container.write(
-      reinterpret_cast<const char *>(&entry), 
-      sizeof(FATEntry)
-    )) {
-      cli::fatal("(store_fat): failed to write FAT entry to container: " + name);
-    }
-  }
+  if (!container.write(serialized_fat.data(), entries * sizeof(FATEntry)))
+    cli::fatal("(store_fat): failed to write FAT data to the container: " + name);
 
   // Flush the container to ensure the FAT is written.
   container.flush();
@@ -242,11 +255,11 @@ void Container::store_fat() {
 void Container::load_fat() {
   // Attempt to seek to the FAT offset.
   container.clear();
-  container.seekp(OFFSET_FAT, std::ios::beg);
+  container.seekg(OFFSET_FAT, std::ios::beg);
   if (!container)
     cli::fatal("(load_fat): failed to seek to FAT offset: " + name);
 
-  // Read the number of entires in the FAT.
+  // Read the number of entries in the FAT.
   std::uint32_t entries;
   if (!container.read(
     reinterpret_cast<char *>(&entries), 
@@ -255,21 +268,24 @@ void Container::load_fat() {
     cli::fatal("(load_fat): failed to read FAT entries from container: " + name);
   }
 
-  // Read all entries from the FAT.
-  std::vector<FATEntry> tmp_fat = {};
-  for (unsigned idx = 0; idx < entries; ++idx) {
+  std::vector<unsigned char> fat_data(entries * sizeof(FATEntry));
+  container.read(
+    reinterpret_cast<char *>(fat_data.data()), 
+    fat_data.size()
+  );
+  if (container.gcount() != fat_data.size())
+    cli::fatal("(load_fat): failed to read FAT entries from container: " + name);
+
+  std::istringstream fat_stream(
+    std::string(fat_data.begin(), fat_data.end())
+  );
+
+  fat.clear();
+  while (fat_stream) {
     FATEntry entry;
-    if (!container.read(
-      reinterpret_cast<char *>(&entry), 
-      sizeof(FATEntry)
-    )) {
-      cli::fatal("(load_fat): failed to read FAT entry from container: " + name);
-    }
-
-    tmp_fat.push_back(entry);
+    if (deserialize(fat_stream, entry))
+      fat.push_back(entry);
   }
-
-  this->fat = tmp_fat;
 }
 
 void Container::list(const std::string &path) {
@@ -301,6 +317,98 @@ void Container::list(const std::string &path) {
   }
 
   output.close();
+}
+
+void Container::store_file(const std::string &in_path) {
+  std::vector<unsigned char> contents = gen_read_file(in_path);
+
+  // Compress file data.
+  std::stringstream compressed_stream;
+  {
+    ios::filtering_ostream out;
+    out.push(ios::zlib_compressor());
+    out.push(compressed_stream);
+    out.write(reinterpret_cast<const char*>(contents.data()), contents.size());
+    out.flush();
+  }
+
+  // Stringify the compressed stream data.
+  std::string compressed_data_str = compressed_stream.str();
+  std::vector<unsigned char> compressed_data(
+    compressed_data_str.begin(), 
+    compressed_data_str.end()
+  );
+
+  std::array<unsigned char, 16> iv = generate_iv();
+  std::vector<unsigned char> enc_data = aes_encrypt(compressed_data, key, iv);
+
+  // Check if an entry of the same file name exists.
+  auto it = std::find_if(
+    fat.begin(), 
+    fat.end(), 
+    [&in_path](const FATEntry& entry) -> bool {
+      return entry.filename == in_path;
+    }
+  );
+
+  // If an entry exists, update it.
+  if (it != fat.end()) {
+    FATEntry &existing = *it;
+    existing.original_size = contents.size();
+    existing.compressed_size = compressed_data.size();
+    existing.encrypted_size = enc_data.size();
+    existing.last_modified = fs::last_write_time(in_path);
+    std::copy(iv.begin(), iv.end(), existing.iv.begin());
+    existing.checksum = compute_checksum(in_path);
+
+    // Reuse existing space if the new entry is smaller.
+    if (existing.encrypted_size >= enc_data.size()) {
+      container.seekp(existing.offset, std::ios::beg);
+      if (!container.write(
+        reinterpret_cast<const char *>(enc_data.data()),
+        enc_data.size()
+      )) {
+        cli::fatal("(store_file): failed to write encrypted data to container: " + name);
+      }
+    } else {
+      // Append to the end of the container.
+      container.seekp(0, std::ios::end);
+      existing.offset = container.tellp();
+      if (!container.write(
+        reinterpret_cast<const char *>(enc_data.data()), 
+        enc_data.size()
+      )) {
+        cli::fatal("(store_file): failed to write encrypted data to container: " + name);
+      }
+    }
+  } else {
+    // Append a new entry to the table.
+    FATEntry entry;
+    entry.filename = in_path;
+    entry.original_size = contents.size();
+    entry.compressed_size = compressed_data.size();
+    entry.encrypted_size = enc_data.size();
+    entry.iv = iv;
+    entry.last_modified = fs::last_write_time(in_path);
+    entry.checksum = compute_checksum(in_path);
+
+    container.seekp(0, std::ios::end);
+    entry.offset = container.tellp();
+    if (!container.write(
+      reinterpret_cast<const char *>(enc_data.data()), 
+      enc_data.size()
+    )) {
+      cli::fatal("(store_file): failed to write encrypted data to container: " + name);
+    }
+
+    fat.push_back(entry);
+  }
+
+  store_fat();
+}
+
+void Container::load_file(const std::string &out_path) {
+  return;
 }
 
 /*

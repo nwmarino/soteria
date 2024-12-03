@@ -11,6 +11,9 @@ namespace soteria {
 /// \param len The length of the byte array.
 std::vector<unsigned char> generate_rand(const std::size_t len = 32);
 
+/// \returns A random initialization vector of size 16.
+std::array<unsigned char, 16> generate_iv();
+
 /// \returns The SHA-256 hash of the file at \p path.
 /// \param path The path to the file.
 std::array<unsigned char, 32> compute_checksum(const std::string &path);
@@ -20,16 +23,16 @@ std::array<unsigned char, 32> compute_checksum(const std::string &path);
 /// \param key The encryption key.
 /// \param iv The initialization vector.
 std::vector<unsigned char> aes_encrypt(const std::vector<unsigned char> &data,
-                                       const std::vector<unsigned char> &key,
-                                       const std::vector<unsigned char> &iv);
+                                       const std::array<unsigned char, 32> &key,
+                                       const std::array<unsigned char, 16> &iv);
 
 /// \returns AES-256-CBC decrypted data.
 /// \param data The data to decrypt.
 /// \param key The decryption key.
 /// \param iv The initialization vector.
 std::vector<unsigned char> aes_decrypt(const std::vector<unsigned char> &data,
-                                       const std::vector<unsigned char> &key,
-                                       const std::vector<unsigned char> &iv);
+                                       const std::array<unsigned char, 32> &key,
+                                       const std::array<unsigned char, 16> &iv);
 
 /// \returns A hashed password.
 /// \param data The password to hash.

@@ -83,10 +83,11 @@
     },
     "cmake.debugConfig": {
         "args": [
-            "--mk",
             "C",
             "--pw",
-            "hello",
+            "hey",
+            "--ls",
+
         ]
     }
 }

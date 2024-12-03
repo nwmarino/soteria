@@ -32,8 +32,7 @@ int main(int argc, char **argv) {
   if (opts.command == cli::Cmd::Make) {
     Container *container = Container::create(
       opts.container, 
-      opts.password, 
-      1024
+      opts.password
     );
     delete container;
     return EXIT_SUCCESS;
@@ -51,15 +50,13 @@ int main(int argc, char **argv) {
   );
 
   if (opts.command == cli::Cmd::Store) {
-    for(std::string &path : opts.paths) {
-      //container->store_file(path, opts.password);
-    }
+    for (std::string &path : opts.paths)
+      container->store_file(path);
   }
 
   if (opts.command == cli::Cmd::Load) {
-    for(std::string &path : opts.paths) {
-      //container->load_file(path, opts.password);
-    }
+    for (std::string &path : opts.paths)
+      container->load_file(path);
   }
 
   if (opts.command == cli::Cmd::List) {

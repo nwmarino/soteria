@@ -5,6 +5,7 @@
 #ifndef SOTERIA_CONTAINER_H
 #define SOTERIA_CONTAINER_H
 
+#include <array>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -27,6 +28,9 @@ class Container {
   /// The hashed master password of the container.
   mutable std::vector<unsigned char> master;
 
+  /// The derived encryption key.
+  mutable std::array<unsigned char, 32> key;
+
   /// The file stream for the container file.
   mutable std::fstream container;
 
@@ -47,7 +51,7 @@ class Container {
   Container(const std::string &name, 
             const std::string &path,
             const std::string &pass,
-            std::size_t size = 1024);
+            std::size_t size);
 
 public:
   ~Container();
@@ -57,7 +61,7 @@ public:
   /// \param size The size of the container.
   static Container *create(const std::string &path, 
                            const std::string &pass, 
-                           std::size_t size);
+                           std::size_t size = 2048);
 
   /// \returns A pre-existing container representation.
   /// \param path The path to the container.
@@ -74,6 +78,14 @@ public:
 
   /// Loads the current state of the FAT from the container.
   void load_fat();
+
+  /// Stores a file to the container.
+  /// \param in_path The path to the file to write.
+  void store_file(const std::string &in_path);
+
+  /// Loads a file from the container.
+  /// \param out_path The path to write the file to.
+  void load_file(const std::string &out_path);
 
   /// Dumps the container's contents to \p path.
   /// \param path The path to dump the container to.

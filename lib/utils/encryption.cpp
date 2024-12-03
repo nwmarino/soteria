@@ -28,6 +28,14 @@ std::vector<unsigned char> soteria::generate_rand(const std::size_t len) {
   return rand;
 }
 
+std::array<unsigned char, 16> soteria::generate_iv() {
+  std::array<unsigned char, 16> iv;
+  if (!RAND_bytes(iv.data(), iv.size()))
+    cli::fatal("failed to generate IV");
+
+  return iv;
+}
+
 std::array<unsigned char, 32> soteria::compute_checksum(const std::string &path) {
   std::vector<unsigned char> data = gen_read_file(path); // Read the file in.
   
@@ -48,14 +56,8 @@ std::array<unsigned char, 32> soteria::compute_checksum(const std::string &path)
 
 std::vector<unsigned char>
 soteria::aes_encrypt(const std::vector<unsigned char> &data,
-                     const std::vector<unsigned char> &key,
-                     const std::vector<unsigned char> &iv) {
-  // Validate key, iv sizes for AES-256.
-  if (key.size() != 32) 
-    cli::fatal("invalid key size: " + std::to_string(key.size()));
-  if (iv.size() != AES_BLOCK_SIZE)
-    cli::fatal("invalid iv size: " + std::to_string(iv.size()));
-
+                     const std::array<unsigned char, 32> &key,
+                     const std::array<unsigned char, 16> &iv) {
   // Initialize cipher context.
   EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
   if (!ctx)
@@ -96,14 +98,8 @@ soteria::aes_encrypt(const std::vector<unsigned char> &data,
 
 std::vector<unsigned char> 
 soteria::aes_decrypt(const std::vector<unsigned char> &data,
-                     const std::vector<unsigned char> &key,
-                     const std::vector<unsigned char> &iv) {
-  // Validate key, iv sizes for AES-256.
-  if (key.size() != 32) 
-    cli::fatal("invalid key size: " + std::to_string(key.size()));
-  if (iv.size() != AES_BLOCK_SIZE)
-    cli::fatal("invalid iv size: " + std::to_string(iv.size()));
-
+                     const std::array<unsigned char, 32> &key,
+                     const std::array<unsigned char, 16> &iv) {
   // Initialize cipher context.
   EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
   if (!ctx)

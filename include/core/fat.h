@@ -29,9 +29,6 @@ struct FATEntry {
   /// Offset of the file in the container.
   std::uint64_t offset;
 
-  /// If true, then the file is compressed.
-  bool is_compressed : 1;
-
   /// Most recent modification timestamp.
   std::time_t last_modified;
 
@@ -39,12 +36,15 @@ struct FATEntry {
   std::array<unsigned char, 16> iv;
 
   /// SHA-256 checksum of the file.
-  std::array<unsigned char, 32> checksum; 
+  std::array<unsigned char, 32> checksum;
 };
 
 /// \returns A FATEntry with file metadata at \p file_path.
 /// \param file_path The path to the file to fetch metadata for.
 FATEntry get_metadata(const std::string &file_path);
+
+void serialize(std::ostringstream &stream, const FATEntry &entry);
+bool deserialize(std::istringstream &stream, FATEntry &entry);
 
 } // end namespace soteria
 
