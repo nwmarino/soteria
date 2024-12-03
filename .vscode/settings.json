@@ -86,7 +86,8 @@
             "C",
             "--pw",
             "hey",
-            "--ls",
+            "--load",
+            "test.txt"
 
         ]
     }

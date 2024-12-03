@@ -17,6 +17,7 @@
 #include "../../include/cli/cli.h"
 #include "../../include/utils/encryption.h"
 #include "../../include/utils/file.h"
+#include <openssl/err.h>
 
 using namespace soteria;
 
@@ -71,29 +72,29 @@ soteria::aes_encrypt(const std::vector<unsigned char> &data,
   }
 
   // Initialize ciphertext buffer to read into.
-  std::vector<unsigned char> ciphertext(data.size() 
-      + EVP_CIPHER_block_size(EVP_aes_256_cbc()));
-  int len = 0, ciphertext_len = 0;
+  int len = 0;
+  int encrypted_len = 0;
+  std::vector<unsigned char> encrypted_data(data.size() + EVP_MAX_BLOCK_LENGTH);
 
   // Attempt to encrypt data.
-  if (!EVP_EncryptUpdate(ctx, ciphertext.data(), &len, 
+  if (!EVP_EncryptUpdate(ctx, encrypted_data.data(), &len, 
       data.data(), data.size())) {
     EVP_CIPHER_CTX_free(ctx);
     cli::fatal("encryption update EVP_EncryptUpdate failed");
   }
-  ciphertext_len = len;
+  encrypted_len = len;
 
   // Attempt to finalize encryption.
-  if (!EVP_EncryptFinal_ex(ctx, ciphertext.data() + len, &len)) {
+  if (!EVP_EncryptFinal_ex(ctx, encrypted_data.data() + len, &len)) {
     EVP_CIPHER_CTX_free(ctx);
     cli::fatal("encryption finalization EVP_EncryptFinal_ex failed");
   }
-  ciphertext_len += len;
+  encrypted_len += len;
 
   // Resize ciphertext buffer to actual read size.
-  ciphertext.resize(ciphertext_len);
+  encrypted_data.resize(encrypted_len);
   EVP_CIPHER_CTX_free(ctx);
-  return ciphertext;
+  return encrypted_data;
 }
 
 std::vector<unsigned char> 
@@ -124,7 +125,13 @@ soteria::aes_decrypt(const std::vector<unsigned char> &data,
   plaintext_len = len;
 
   // Attempt to finalize decryption.
-  if (EVP_DecryptFinal_ex(ctx, plaintext.data() + len, &len) != 1) {
+  if (!EVP_DecryptFinal_ex(ctx, plaintext.data() + len, &len)) {
+    unsigned long err_code = ERR_get_error();
+    std::cerr << "Decryption failed with error code: " << err_code << std::endl;
+    // You can also print out a human-readable error message
+    char err_buff[120];
+    ERR_error_string_n(err_code, err_buff, sizeof(err_buff));
+    std::cerr << "OpenSSL error: " << err_buff << std::endl;
     EVP_CIPHER_CTX_free(ctx);
     cli::fatal("encryption finalization EVP_DecryptFinal_ex failed");
   }

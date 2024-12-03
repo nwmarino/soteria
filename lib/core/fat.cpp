@@ -90,20 +90,20 @@ bool soteria::deserialize(std::istringstream &stream, FATEntry &entry) {
     // Convert buffer to string, trimming padding.
     entry.filename = std::string(filename_buf);
 
-    // Read in the originbal, encrypted, and compressed sizes.
+    // Read in the originbal, compressed, and encrypted sizes.
     stream.read(
       reinterpret_cast<char *>(&entry.original_size),
       sizeof(entry.original_size)
     );
     stream.read(
-      reinterpret_cast<char *>(&entry.encrypted_size), 
-      sizeof(entry.encrypted_size)
-    );
-    stream.read(
       reinterpret_cast<char *>(&entry.compressed_size), 
       sizeof(entry.compressed_size)
     );
-
+    stream.read(
+      reinterpret_cast<char *>(&entry.encrypted_size), 
+      sizeof(entry.encrypted_size)
+    );
+    
     // Read in the offset.
     stream.read(
       reinterpret_cast<char *>(&entry.offset), 

@@ -28,7 +28,6 @@
 #include "../../include/cli/cli.h"
 #include "../../include/core/container.h"
 #include "../../include/core/fat.h"
-#include "../../include/utils/compression.h"
 #include "../../include/utils/encryption.h"
 #include "../../include/utils/file.h"
 
@@ -358,7 +357,7 @@ void Container::store_file(const std::string &in_path) {
     existing.compressed_size = compressed_data.size();
     existing.encrypted_size = enc_data.size();
     existing.last_modified = fs::last_write_time(in_path);
-    std::copy(iv.begin(), iv.end(), existing.iv.begin());
+    existing.iv = iv;
     existing.checksum = compute_checksum(in_path);
 
     // Reuse existing space if the new entry is smaller.
@@ -408,160 +407,56 @@ void Container::store_file(const std::string &in_path) {
 }
 
 void Container::load_file(const std::string &out_path) {
-  return;
-}
+  load_fat();
 
-/*
-void Container::store_file(const std::string &in_path, 
-                           const std::string &password) {
-  std::vector<unsigned char> enc_key = load_key(password);
-  read_fat();
-
-  // Find an existing entry in the FAT to potentially overwrite it.
+  // Check if an entry of the same file name exists.
   auto it = std::find_if(
     fat.begin(), 
-    fat.end(),
-    [&in_path](const FATEntry &entry) -> bool {
-      return entry.filename == in_path;
-    }
-  );
-
-  // Collect file data and compress it.
-  std::vector<unsigned char> file_data = gen_read_file(in_path);
-  std::vector<unsigned char> compressed_data = compress(file_data);
-  std::string checksum = generate_sha256(file_data);
-
-  // Encrypt compressed file data.
-  std::vector<unsigned char> iv = generate_rand(16);
-  std::vector<unsigned char> enc_data = aes_encrypt(compressed_data, enc_key, iv);
-
-  // Update the FAT entry for this file.
-  FATEntry entry;
-  if (it != fat.end()) {
-    // Overwrite the existing entry, if it existed.
-    entry = *it;
-  } else {
-    // Create a new entry if one didn't exist.
-    entry.filename = in_path;
-    fat.push_back(entry);
-  }
-
-  // Update FAT metadata.
-  entry.checksum = checksum;
-  entry.size = file_data.size();
-  entry.compressed_size = compressed_data.size();
-  entry.enc_size = enc_data.size();
-  entry.offset = end_offset();
-  entry.iv = iv;
-
-  // Write encrypted data to the container.
-  container.seekp(entry.offset);
-  container.write(
-    reinterpret_cast<const char *>(iv.data()), 
-    iv.size()
-  );
-  container.write(
-    reinterpret_cast<const char *>(enc_data.data()), 
-    enc_data.size()
-  );
-
-  // Update the FAT.
-  write_fat();
-}
-
-void Container::load_file(const std::string &out_path, 
-                          const std::string &password) {
-  std::vector<unsigned char> enc_key = load_key(password);
-  read_fat();
-
-  // Locate the file in the FAT.
-  auto it = std::find_if(
-    fat.begin(),
-    fat.end(),
-    [&out_path](const FATEntry &entry) -> bool { 
-      return entry.filename == out_path; 
+    fat.end(), 
+    [&out_path](const FATEntry& entry) -> bool {
+      return entry.filename == out_path;
     }
   );
 
   if (it == fat.end())
     cli::fatal("unresolved file in container: " + out_path);
 
-  const FATEntry entry = *it;
+  const FATEntry &entry = *it;
 
-  // Go to the existing file offset for reading.
-  container.seekg(entry.offset);
+  // Read data from container.
+  container.seekg(entry.offset, std::ios::beg);
+  std::vector<unsigned char> enc_data(entry.encrypted_size);
+  container.read(
+    reinterpret_cast<char *>(enc_data.data()), 
+    enc_data.size()
+  );
+
+  if (container.gcount() != static_cast<std::streamsize>(entry.encrypted_size))
+    cli::fatal("(load_file): failed to read encrypted data from container: " + name);
+
+  // Decrypt and decompress the read data.
+  std::vector<unsigned char> dec_data = aes_decrypt(enc_data, key, entry.iv);
+
+  // Decompress dec-data.
+  std::stringstream dec_stream(
+    std::string(dec_data.begin(), dec_data.end())
+  );
+
+  ios::filtering_istream in;
+  in.push(ios::zlib_decompressor());
+  in.push(dec_stream);
+
+  std::vector<unsigned char> file_data;
+  while (in) {
+    char buffer[1024];
+    in.read(buffer, sizeof(buffer));
+    file_data.insert(
+      file_data.end(), 
+      buffer, 
+      buffer + in.gcount()
+    );
+  }
+
+  // Attempt to open the output file.
+  bin_write_file(out_path, file_data);
 }
-
-
-void Container::store_key(const std::vector<unsigned char> &key, 
-                          const std::string &password) {
-  std::vector<unsigned char> salt(16);
-  if (!RAND_bytes(salt.data(), salt.size()))
-    cli::fatal("failed to generate salt for KEK storage");
-
-  // Derive the KEK from the password.
-  std::vector<unsigned char> kek = hash_password(password, salt);
-
-  // Encrypt the encryption key with the kek.
-  std::vector<unsigned char> iv(16);
-  if (!RAND_bytes(iv.data(), iv.size()))
-    cli::fatal("failed to generate IV for KEK storage");
-  std::vector<unsigned char> encrypted_key = aes_encrypt(key, kek, iv);
-
-  std::size_t salt_len = salt.size();
-  std::size_t key_len = encrypted_key.size();
-
-  // Write the salt, IV, and encrypted key to the container.
-  container.write(
-    reinterpret_cast<const char *>(&salt_len), 
-    sizeof(salt_len)
-  );
-  container.write(
-    reinterpret_cast<const char *>(salt.data()), 
-    salt.size()
-  );
-  container.write(
-    reinterpret_cast<const char *>(iv.data()), 
-    iv.size()
-  );
-  container.write(
-    reinterpret_cast<const char *>(&key_len), 
-    sizeof(key_len)
-  );
-  container.write(
-    reinterpret_cast<const char *>(encrypted_key.data()), 
-    key_len
-  );
-}
-
-std::vector<unsigned char> Container::load_key(const std::string &password) {
-  // Read the salt.
-  std::size_t salt_len;
-  container.read(reinterpret_cast<char *>(&salt_len), sizeof(salt_len));
-  std::vector<unsigned char> salt(salt_len);
-  container.read(reinterpret_cast<char *>(salt.data()), salt_len);
-
-  // Read the IV and encryption key.
-  std::vector<unsigned char> iv(16);
-  container.read(reinterpret_cast<char *>(iv.data()), iv.size());
-
-  std::size_t key_len;
-  container.read(reinterpret_cast<char *>(&key_len), sizeof(key_len));
-  std::vector<unsigned char> encrypted_key(key_len);
-  container.read(reinterpret_cast<char *>(encrypted_key.data()), key_len);
-
-  // Derive the KEK and decrypt the encryption key.
-  std::vector<unsigned char> kek = hash_password(password, salt);
-  return aes_decrypt(encrypted_key, kek, iv);
-}
-
-void Container::change_master(const std::string &old_pass, 
-                              const std::string &new_pass) {
-  // Retrieve the current encryption key.
-  std::vector<unsigned char> encryption_key = load_key(old_pass);
-
-  // Store the encryption key with the new password.
-  store_key(encryption_key, new_pass);
-}
-
-*/
