@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "openssl/aes.h"
+#include "openssl/err.h"
 #include "openssl/evp.h"
 #include "openssl/rand.h"
 #include "openssl/sha.h"
@@ -17,7 +18,6 @@
 #include "../../include/cli/cli.h"
 #include "../../include/utils/encryption.h"
 #include "../../include/utils/file.h"
-#include <openssl/err.h>
 
 using namespace soteria;
 

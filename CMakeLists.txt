@@ -6,8 +6,15 @@ cmake_policy(SET CMP0167 NEW)
 find_package(Boost REQUIRED COMPONENTS filesystem program_options iostreams)
 find_package(OpenSSL REQUIRED)
 
-include(CTest)
-enable_testing()
+include(FetchContent)
+
+FetchContent_Declare(
+  catch2
+  GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+  GIT_TAG v3.4.0 # Replace with the desired version
+)
+
+FetchContent_MakeAvailable(catch2)
 
 set(INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
@@ -44,25 +51,23 @@ target_link_libraries(soteria
         soteria_utils
 )
 
-find_package(Catch2 3 REQUIRED)
+# 
+# Testing
+#
 
-add_executable(tests
-    test/utils/test_aes.cpp
-)
+file(GLOB TEST_SOURCES tests/utils/*.cpp)
+add_executable(soteria_tests ${TEST_SOURCES} lib/cli/cli.cpp)
 
-target_include_directories(tests
-    PUBLIC
-        test/
-)
-
-target_link_libraries(tests
+target_link_libraries(soteria_tests
     PRIVATE
-        Catch2::Catch2
         ${Boost_LIBRARIES}
+        Catch2::Catch2WithMain
         OpenSSL::Crypto
         soteria_cli
         soteria_core
         soteria_utils
 )
 
-add_test(NAME tests COMMAND tests)
+include(CTest)
+include(Catch)
+catch_discover_tests(soteria_tests)

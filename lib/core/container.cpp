@@ -102,9 +102,8 @@ Container::Container(const std::string &name,
     std::ios::binary | std::ios::in | std::ios::out | std::ios::trunc
   );
 
-  if (!container.is_open()) {
+  if (!container.is_open())
     cli::fatal("failed to create container: " + name);
-  }
 
   // Hash the new master and store it to the container.
   this->salt = generate_rand(WIDTH_SALT);
@@ -113,10 +112,12 @@ Container::Container(const std::string &name,
 
   // Write the remaining initial space as empty.
   std::vector<unsigned char> empty_space(size - container.tellp(), 0);
-  container.write(
+  if (!container.write(
     reinterpret_cast<const char *>(empty_space.data()), 
     empty_space.size()
-  );
+  )) {
+    cli::fatal("failed to write empty space to container: " + name);
+  }
 
   fat.clear();
   store_fat();
