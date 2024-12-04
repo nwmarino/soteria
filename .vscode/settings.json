@@ -79,7 +79,9 @@
         "hash_set": "cpp",
         "strstream": "cpp",
         "complex": "cpp",
-        "typeindex": "cpp"
+        "typeindex": "cpp",
+        "regex": "cpp",
+        "future": "cpp"
     },
     "cmake.debugConfig": {
         "args": [

@@ -3,3 +3,6 @@ build/
 main
 soteria
 soteria.exe
+tests
+tests.exe
+features.txt

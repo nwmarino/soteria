@@ -14,6 +14,9 @@ std::vector<unsigned char> generate_rand(const std::size_t len = 32);
 /// \returns A random initialization vector of size 16.
 std::array<unsigned char, 16> generate_iv();
 
+/// \returns A random key of size 32.
+std::array<unsigned char, 32> generate_key();
+
 /// \returns The SHA-256 hash of the file at \p path.
 /// \param path The path to the file.
 std::array<unsigned char, 32> compute_checksum(const std::string &path);

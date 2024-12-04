@@ -6,10 +6,13 @@ cmake_policy(SET CMP0167 NEW)
 find_package(Boost REQUIRED COMPONENTS filesystem program_options iostreams)
 find_package(OpenSSL REQUIRED)
 
-add_subdirectory(lib)
+include(CTest)
+enable_testing()
 
 set(INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_subdirectory(lib)
 
 target_include_directories(soteria_cli
     PUBLIC
@@ -40,3 +43,26 @@ target_link_libraries(soteria
         soteria_core
         soteria_utils
 )
+
+find_package(Catch2 3 REQUIRED)
+
+add_executable(tests
+    test/utils/test_aes.cpp
+)
+
+target_include_directories(tests
+    PUBLIC
+        test/
+)
+
+target_link_libraries(tests
+    PRIVATE
+        Catch2::Catch2
+        ${Boost_LIBRARIES}
+        OpenSSL::Crypto
+        soteria_cli
+        soteria_core
+        soteria_utils
+)
+
+add_test(NAME tests COMMAND tests)

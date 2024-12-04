@@ -37,6 +37,14 @@ std::array<unsigned char, 16> soteria::generate_iv() {
   return iv;
 }
 
+std::array<unsigned char, 32> soteria::generate_key() {
+  std::array<unsigned char, 32> key;
+  if (!RAND_bytes(key.data(), key.size()))
+    cli::fatal("failed to generate random key");
+
+  return key;
+}
+
 std::array<unsigned char, 32> soteria::compute_checksum(const std::string &path) {
   std::vector<unsigned char> data = gen_read_file(path); // Read the file in.
   
