@@ -56,6 +56,13 @@ int main(int argc, char **argv) {
       container->load_file(path);
   }
 
+  if (opts.command == cli::Cmd::Delete) {
+    for (std::string &path : opts.paths) {
+      if (!container->delete_file(path))
+        cli::fatal("[soteria] failed to delete file: " + path);
+    }
+  }
+
   if (opts.command == cli::Cmd::List) {
     container->list(opts.container.substr(
       opts.container.find_last_of('/') + 1) + "_ls.txt"

@@ -430,6 +430,36 @@ void Container::load_fat() {
   }
 }
 
+bool Container::delete_file(const std::string &path) {
+  // Check if the file exists in the FAT.
+  auto it = std::find_if(
+    fat.begin(), 
+    fat.end(), 
+    [&path](const FATEntry& entry) -> bool {
+      return entry.filename == path;
+    }
+  );
+
+  if (it == fat.end()) 
+    return false;
+
+  const uint64_t offset = it->offset;
+  const uint64_t size = it->encrypted_size;
+
+  // Clear the file data from the container.
+  container.seekp(offset, std::ios::beg);
+  std::vector<unsigned char> empty_data(size, 0);
+  if (!container.write(
+    reinterpret_cast<const char *>(empty_data.data()), 
+    empty_data.size()
+  )) {
+    cli::fatal("[delete_file] failed to clear file data: " + name);
+  }
+
+  fat.erase(it); // Remove the file from the FAT.
+  return true;
+}
+
 /// Dumps metadata for each FAT entry to the file at path.
 ///
 /// This function loads the FAT into container memory and does not clear it.

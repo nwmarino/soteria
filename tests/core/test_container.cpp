@@ -1,7 +1,6 @@
 #include "boost/filesystem/operations.hpp"
 #include "catch2/catch_test_macros.hpp"
 #include "catch2/generators/catch_generators.hpp"
-#include "openssl/aes.h"
 
 #include "../../include/core/container.h"
 
@@ -71,7 +70,7 @@ TEST_CASE("Container file storing", "[container]") {
   fs::remove("test_file");
 
   // One block size since the file is 4 bytes, 12 byte padding.
-  REQUIRE(fs::file_size("test") == 1024 + AES_BLOCK_SIZE);
+  REQUIRE(fs::file_size("test") == 1024);
   delete container;
   fs::remove("test");
 }
@@ -101,5 +100,29 @@ TEST_CASE("Container file loading", "[container]") {
   REQUIRE(content == "test");
   delete container_o;
   fs::remove("test_file");
+  fs::remove("test");
+}
+
+TEST_CASE("Container file deletion", "[container]") {
+  Container *container_c = Container::create("test", "password");
+  delete container_c;
+
+  Container *container_o = Container::open("test", "password");
+
+  std::ofstream input_file("test_file");
+  REQUIRE(fs::exists("test_file"));
+  input_file << "test";
+  input_file.close();
+
+  container_o->store_file("test_file");
+  fs::remove("test_file");
+  REQUIRE(!container_o->get_fat().empty());
+
+  container_o->delete_file("test_file");
+
+  REQUIRE(!fs::exists("test_file"));
+  REQUIRE(container_o->get_fat().empty());
+
+  delete container_o;
   fs::remove("test");
 }

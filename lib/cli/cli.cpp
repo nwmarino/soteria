@@ -56,6 +56,11 @@ using namespace soteria;
       bpo::value<std::vector<std::string>>(&opts.paths)->multitoken(), 
       "load files from the container")
     (
+      "delete,del",
+      bpo::value<std::vector<std::string>>(&opts.paths)->multitoken(),
+      "delete files from the container"
+    )
+    (
       "log", 
       "log the container audit log to a file"
     )
@@ -119,10 +124,17 @@ using namespace soteria;
       opts.command = Cmd::Store;
       opts.paths = vmap["store"].as<std::vector<std::string>>();
     }
+
     if (vmap.count("load")) {
       command_count++;
       opts.command = Cmd::Load;
       opts.paths = vmap["load"].as<std::vector<std::string>>();
+    }
+
+    if (vmap.count("delete")) {
+      command_count++;
+      opts.command = Cmd::Delete;
+      opts.paths = vmap["delete"].as<std::vector<std::string>>();
     }
 
     if (vmap.count("list")) {

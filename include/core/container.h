@@ -105,6 +105,11 @@ public:
   /// \param out_path The path to write the file to.
   void load_file(const std::string &out_path);
 
+  /// Attempts to delete file at \p path from the container and the FAT.
+  /// \param path The path to the file to delete.
+  /// \returns `true` if the deletion was successful.
+  bool delete_file(const std::string &path); 
+
   /// Dumps the container's contents to \p path.
   /// \param path The path to dump the container to.
   void list(const std::string &path);

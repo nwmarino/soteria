@@ -20,6 +20,7 @@ public:
     Make = 0,
     Remove,
     Store,
+    Delete,
     Load,
     List,
     Log,
