@@ -29,6 +29,7 @@ target_include_directories(soteria_cli
 
 target_include_directories(soteria_core
     PUBLIC
+        ${PROJECT_BINARY_DIR}
         ${INCLUDE_DIR}
 )
 
@@ -54,7 +55,7 @@ target_link_libraries(soteria
 
 target_include_directories(soteria
     PUBLIC
-        "${PROJECT_BINARY_DIR}"
+        ${PROJECT_BINARY_DIR}
         ${INCLUDE_DIR}
 )
 

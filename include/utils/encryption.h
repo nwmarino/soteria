@@ -22,8 +22,11 @@ std::array<unsigned char, 16> generate_iv();
 /// \returns A random key of 32 bytes.
 std::array<unsigned char, 32> generate_key();
 
-/// \returns The SHA-256 hash of the file at \p path.
+/// \returns The SHA-256 checksum of the file at \p path.
 std::array<unsigned char, 32> compute_checksum(const std::string &path);
+
+/// \returns The SHA-256 checksum of \p data.
+std::array<unsigned char, 32> compute_checksum(const std::vector<unsigned char> &data);
 
 /// \returns AES-256-CBC encrypted data.
 /// \param data The data to encrypt.

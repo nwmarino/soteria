@@ -62,6 +62,22 @@ std::array<unsigned char, 32> soteria::compute_checksum(const std::string &path)
   return checksum;
 }
 
+std::array<unsigned char, 32> 
+soteria::compute_checksum(const std::vector<unsigned char> &data) {
+  unsigned char hash[SHA256_DIGEST_LENGTH];
+  SHA256(data.data(), data.size(), hash);
+
+  // Copy the hash to a fixed-size array.
+  std::array<unsigned char, 32> checksum;
+  std::copy(
+    hash, 
+    hash + SHA256_DIGEST_LENGTH, 
+    checksum.begin()
+  );
+
+  return checksum;
+}
+
 std::vector<unsigned char>
 soteria::aes_encrypt(const std::vector<unsigned char> &data,
                      const std::array<unsigned char, 32> &key,

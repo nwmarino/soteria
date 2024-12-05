@@ -3,6 +3,10 @@
 // The following source implements the container class and its respective
 // methods.
 //
+// Container files have the following reserved layout (in bytes):
+//
+// { [version : 1][salt : 16][hash : 32][FAT entries : ...] }
+//
 //>==----------------------------------------------------------------------==<//
 
 #include <algorithm>
@@ -18,6 +22,7 @@
 #include "cli/cli.h"
 #include "core/container.h"
 #include "core/fat.h"
+#include "include/core/version.h"
 #include "utils/encryption.h"
 #include "utils/file.h"
 
@@ -29,12 +34,14 @@ using namespace soteria;
 /// Default number of iterations to use for PBKDF2.
 constexpr std::size_t PBKDF2_ITERATIONS = 100000;
 
-/// Byte-width of any salt, hash.
+/// Byte-widths.
+constexpr std::size_t WIDTH_VERSION = 4;
 constexpr std::size_t WIDTH_SALT = 16;
 constexpr std::size_t WIDTH_HASH = 32;
 
 /// Constant offsets for the reserved container layout.
-constexpr std::size_t OFFSET_MASTER_SALT = 0;
+constexpr std::size_t OFFSET_VERSION = 0;
+constexpr std::size_t OFFSET_MASTER_SALT = OFFSET_VERSION + WIDTH_VERSION;
 constexpr std::size_t OFFSET_MASTER_HASH = OFFSET_MASTER_SALT + WIDTH_SALT;
 constexpr std::size_t OFFSET_FAT = OFFSET_MASTER_HASH + WIDTH_HASH;
 
@@ -51,6 +58,9 @@ Container::Container(const std::string &path,
 
   if (!container || !container.is_open())
     cli::fatal("[container] failed to open: " + name);
+
+  // Check the version.
+  load_version();
 
   // Load the stored master hash and compare it to the input password.
   load_master();
@@ -97,6 +107,21 @@ Container::Container(const std::string &name,
   if (!container.is_open())
     cli::fatal("[container] failed to create: " + name);
 
+  // Check that the current version is valid to store.
+  const std::string major_str = std::to_string(VERSION_MAJOR);
+  if (major_str.size() > 2)
+    cli::fatal("[container] invalid version, major too large: " + major_str);
+
+  const std::string minor_str = std::to_string(VERSION_MINOR);
+  if (minor_str.size() > 2)
+    cli::fatal("[container] invalid version, minor too large: " + minor_str);
+
+  version.at(0) = std::string(major_str).c_str()[0];
+  version.at(1) = std::string(major_str).c_str()[1];
+  version.at(2) = std::string(minor_str).c_str()[0];
+  version.at(3) = std::string(minor_str).c_str()[1];
+  store_version();
+
   // Hash the master password and store it to the container.
   this->salt = generate_rand(WIDTH_SALT);
   this->master = hash_password(pass, salt);
@@ -141,6 +166,62 @@ Container *Container::create(const std::string &path,
 Container *Container::open(const std::string &path, const std::string &pass)
 { return new Container(path, pass); }
 
+/// Writes container::version to the container.
+///
+/// This method should only ever be called by the opening constructor, as after
+/// creation, a version should be immutable.
+void Container::store_version() {
+  // Clear the container position for writing.
+  container.clear();
+  container.seekp(OFFSET_VERSION, std::ios::beg);
+
+  // Write the version to the container.
+  if (!container.write(
+    reinterpret_cast<const char *>(version.data()),
+    WIDTH_VERSION
+  )) {
+    cli::fatal("[store_version] failed to write version: " + name);
+  }
+
+  // Flush the container to ensure the version is written.
+  if (!container.flush())
+    cli::fatal("[store_version] failed to flush stream: " + name);
+}
+
+void Container::load_version() {
+  // Clear the container position for reading.
+  container.clear();
+  container.seekg(OFFSET_VERSION, std::ios::beg);
+
+  // Attempt to read the version from the container.
+  if (!container.read(reinterpret_cast<char *>(version.data()), WIDTH_VERSION))
+    cli::fatal("[load_version] failed to read version: " + name);
+
+  // Stringify the current version of the program.
+  const std::string major_str = std::to_string(VERSION_MAJOR);
+  const std::string minor_str = std::to_string(VERSION_MINOR);
+  std::array<unsigned char, 4> curr_version_str;
+  curr_version_str.at(0) = std::string(major_str).c_str()[0];
+  curr_version_str.at(1) = std::string(major_str).c_str()[1];
+  curr_version_str.at(2) = std::string(minor_str).c_str()[0];
+  curr_version_str.at(3) = std::string(minor_str).c_str()[1];
+
+  // Check that the versions match.
+  if (std::string(version.begin(), version.end()) != std::string(curr_version_str.begin(), curr_version_str.end())) {
+    // Stringify the read in version.
+    std::string container_version_str;
+    container_version_str.push_back(version.at(0));
+    container_version_str.push_back(version.at(1));
+    container_version_str.push_back('.');
+    container_version_str.push_back(version.at(2));
+    container_version_str.push_back(version.at(3));
+    
+    cli::fatal("[load_version] current version (" + std::to_string(VERSION_MAJOR) 
+      + '.' + std::to_string(VERSION_MINOR) + ") incompatible with container: " 
+      + name + ", expected " + container_version_str);
+  }
+}
+
 /// Writes container::master to the container.
 ///
 /// This function writes the master password hash with a new salt to the 
@@ -152,7 +233,7 @@ Container *Container::open(const std::string &path, const std::string &pass)
 void Container::store_master() {
   // Clear the container positioning for writing.
   container.clear();
-  container.seekp(0, std::ios::beg);
+  container.seekp(OFFSET_MASTER_SALT, std::ios::beg);
 
   // Write the salt at its offset.
   assert(container.tellp() == OFFSET_MASTER_SALT);
@@ -186,7 +267,7 @@ void Container::store_master() {
 void Container::load_master() {
   // Clear the container positioning for reading.
   container.clear();
-  container.seekg(0, std::ios::beg);
+  container.seekg(OFFSET_MASTER_SALT, std::ios::beg);
 
   // Read the stored salt.
   std::vector<unsigned char> tmp_salt(WIDTH_SALT);
@@ -200,7 +281,6 @@ void Container::load_master() {
 
   // Read the stored hash.
   std::vector<unsigned char> tmp_hash(WIDTH_HASH);
-  container.seekg(16, std::ios::beg);
   assert(container.tellg() == OFFSET_MASTER_HASH);
   if (!container.read(
     reinterpret_cast<char *>(tmp_hash.data()), 
@@ -481,7 +561,7 @@ void Container::load_file(const std::string &out_path) {
   }
 
   // Compare the checksum.
-  if (compute_checksum(out_path) != entry.checksum)
+  if (compute_checksum(file_data) != entry.checksum)
     cli::fatal("[load_file] checksum mismatch: " + out_path);
   else
     cli::info("[load_file] " + out_path + " checksum matches!");

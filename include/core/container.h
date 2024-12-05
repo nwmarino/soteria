@@ -25,6 +25,9 @@ class Container {
   /// The path to the container.
   const std::string path;
 
+  /// The version of the container.
+  std::array<unsigned char, 4> version;
+
   /// The salt used to hash the master password.
   mutable std::vector<unsigned char> salt;
 
@@ -55,6 +58,12 @@ class Container {
             const std::string &path,
             const std::string &pass,
             std::size_t size);
+
+  /// Writes the version to the container.
+  void store_version();
+
+  /// Loads the version from the container.
+  void load_version();
 
   /// Writes the current master hash to the container.
   void store_master();

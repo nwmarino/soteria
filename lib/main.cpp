@@ -8,9 +8,9 @@
 
 #include "boost/filesystem/operations.hpp"
 
-#include "include/core/version.h"
 #include "cli/cli.h"
 #include "core/container.h"
+#include "include/core/version.h"
 
 namespace fs = boost::filesystem;
 
