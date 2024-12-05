@@ -36,6 +36,8 @@ constexpr std::size_t PBKDF2_ITERATIONS = 100000;
 
 /// Byte-widths.
 constexpr std::size_t WIDTH_VERSION = 4;
+constexpr std::size_t WIDTH_SIZE = 8;
+constexpr std::size_t WIDTH_IV = 16;
 constexpr std::size_t WIDTH_SALT = 16;
 constexpr std::size_t WIDTH_HASH = 32;
 
@@ -43,7 +45,9 @@ constexpr std::size_t WIDTH_HASH = 32;
 constexpr std::size_t OFFSET_VERSION = 0;
 constexpr std::size_t OFFSET_MASTER_SALT = OFFSET_VERSION + WIDTH_VERSION;
 constexpr std::size_t OFFSET_MASTER_HASH = OFFSET_MASTER_SALT + WIDTH_SALT;
-constexpr std::size_t OFFSET_FAT = OFFSET_MASTER_HASH + WIDTH_HASH;
+constexpr std::size_t OFFSET_FAT_IV = OFFSET_MASTER_HASH + WIDTH_HASH;
+constexpr std::size_t OFFSET_FAT_SIZE = OFFSET_FAT_IV + WIDTH_IV;
+constexpr std::size_t OFFSET_FAT = OFFSET_FAT_SIZE + WIDTH_SIZE;
 
 Container::Container(const std::string &path,
                      const std::string &pass) 
@@ -92,6 +96,8 @@ Container::Container(const std::string &path,
   std::fill(salt.begin(), salt.end(), 0);
   std::fill(master.begin(), master.end(), 0);
   std::fill(derived_tmp.begin(), derived_tmp.end(), 0);
+
+  load_fat(); // Load the FAT from the container.
 }
 
 Container::Container(const std::string &name, 
@@ -125,6 +131,23 @@ Container::Container(const std::string &name,
   // Hash the master password and store it to the container.
   this->salt = generate_rand(WIDTH_SALT);
   this->master = hash_password(pass, salt);
+
+  // Derive the encryption key from the password.
+  std::array<unsigned char, 32> derived_tmp;
+  if (!PKCS5_PBKDF2_HMAC(
+    pass.c_str(),
+    pass.length(),
+    salt.data(),
+    WIDTH_SALT,
+    PBKDF2_ITERATIONS,
+    EVP_sha256(),
+    WIDTH_HASH,
+    derived_tmp.data()
+  )) {
+    cli::fatal("[container] failed to derive encryption key: " + name);
+  }
+
+  this->key = derived_tmp;
   store_master(); // Clears salt, master from memory.
 
   // Write the remaining reserved space as empty.
@@ -135,13 +158,11 @@ Container::Container(const std::string &name,
   )) {
     cli::fatal("[container] failed to allocate space for: " + name);
   }
-
-  // Writes an empty FAT to the new container.
-  fat.clear();
-  store_fat();
 }
 
 Container::~Container() {
+  store_fat();
+
   // Clear all sensitive data from memory.
   std::fill(salt.begin(), salt.end(), 0);
   std::fill(master.begin(), master.end(), 0);
@@ -300,30 +321,52 @@ void Container::load_master() {
 ///
 /// This method does not modify the current FAT state.
 void Container::store_fat() {
+  // Clear the container positioning for writing.
   container.clear();
-  container.seekp(OFFSET_FAT, std::ios::beg);
+  container.seekp(OFFSET_FAT_IV, std::ios::beg);
   if (!container)
     cli::fatal("[store_fat] failed to update FAT: " + name);
 
-  // Attempt to write the number of entries in the FAT.
-  uint32_t entries = this->fat.size();
+  // Attempt to write a new IV for the FAT.
+  std::array<unsigned char, 16> iv = generate_iv();
   if (!container.write(
-    reinterpret_cast<const char *>(&entries), 
-    sizeof(uint32_t)
+    reinterpret_cast<const char *>(iv.data()), 
+    WIDTH_IV
   )) {
-    cli::fatal("[store_fat] failed to write FAT entry count: " + name);
+    cli::fatal("[store_fat] failed to store FAT IV: " + name);
   }
 
-  // Initialize a string stream to serialize the FAT.
+  // Serialize all FAT entries and stringify the stream.
   std::ostringstream fat_stream;
   for (const FATEntry &entry : fat) {
     serialize(fat_stream, entry);
   }
-
-  // Write each entry from the stringified stream.
   const std::string serialized_fat = fat_stream.str();
-  if (!container.write(serialized_fat.data(), entries * sizeof(FATEntry)))
+
+  // Encrypt the serialized FAT.
+  std::vector<unsigned char> enc_fat = aes_encrypt(
+    std::vector<unsigned char>(serialized_fat.begin(), serialized_fat.end()), 
+    key,
+    iv
+  );
+
+  // Write the size of the encrypted FAT to the container.
+  const uint64_t size = enc_fat.size();
+  container.seekp(OFFSET_FAT_SIZE, std::ios::beg);
+  if (!container.write(
+    reinterpret_cast<const char *>(&size), 
+    WIDTH_SIZE
+  )) {
+    cli::fatal("[store_fat] failed to store FAT size: " + name);
+  }
+
+  // Write the encrypted FAT to the container.
+  if (!container.write(
+    reinterpret_cast<const char *>(enc_fat.data()), 
+    enc_fat.size())
+  ) {
     cli::fatal("[store_FAT] failed to update FAT entries: " + name);
+  }
 
   // Flush the container to ensure the FAT is written.
   if (!container.flush())
@@ -334,33 +377,49 @@ void Container::store_fat() {
 ///
 /// This method does not modify the stored FAT state.
 void Container::load_fat() {
+  // Clear the container positioning for reading.
   container.clear();
-  container.seekg(OFFSET_FAT, std::ios::beg);
+  container.seekg(OFFSET_FAT_IV, std::ios::beg);
   if (!container)
     cli::fatal("[load_fat] failed to reach FAT: " + name);
 
-  // Read the number of entries in the FAT.
-  uint32_t entries;
+  // Read the IV for the FAT.
+  std::array<unsigned char, 16> iv;
   if (!container.read(
-    reinterpret_cast<char *>(&entries), 
-    sizeof(uint32_t)
+    reinterpret_cast<char *>(iv.data()), 
+    WIDTH_IV
   )) {
-    cli::fatal("[load_fat] failed to read FAT entry count: " + name);
+    cli::fatal("[load_fat] failed to load FAT IV: " + name);
   }
 
-  // Read the FAT entries from the container.
-  std::vector<unsigned char> fat_data(entries * sizeof(FATEntry));
-  container.read(
-    reinterpret_cast<char *>(fat_data.data()), 
-    fat_data.size()
-  );
+  // Read the size of the encrypted FAT.
+  uint64_t size;
+  container.seekg(OFFSET_FAT_SIZE, std::ios::beg);
+  if (!container.read(
+    reinterpret_cast<char *>(&size), 
+    WIDTH_SIZE
+  )) {
+    cli::fatal("[load_fat] failed to load FAT size: " + name);
+  }
+
+  // Read the encrypted FAT from the container.
+  std::vector<unsigned char> enc_fat(size);
+  if (!container.read(
+    reinterpret_cast<char *>(enc_fat.data()), 
+    enc_fat.size()
+  )) {
+    cli::fatal("[load_fat] failed to load FAT entries: " + name);
+  }
 
   // Check if the number of entries read matches the expected count.
-  if (container.gcount() != fat_data.size())
-    cli::fatal("[load_fat] failed to read FAT entries: " + name);
+  if (container.gcount() != size)
+    cli::fatal("[load_fat] failed to load FAT entries: " + name);
 
-  // Initialize a string stream to deserialize the FAT.
-  std::istringstream fat_stream(std::string(fat_data.begin(), fat_data.end()));
+  // Decrypt the FAT.
+  std::vector<unsigned char> dec_fat = aes_decrypt(enc_fat, key, iv);
+
+  // Initialize a string stream to deserialize the decrypted FAT.
+  std::istringstream fat_stream(std::string(dec_fat.begin(), dec_fat.end()));
 
   // Clear the FAT and attempt to read deserialized entries from the stream.
   fat.clear();
@@ -375,8 +434,6 @@ void Container::load_fat() {
 ///
 /// This function loads the FAT into container memory and does not clear it.
 void Container::list(const std::string &path) {
-  load_fat(); // Load the stored FAT to memory for reading.
-
   // Attempt to open the dump file.
   std::ofstream output(path);
   if (!output || !output.is_open())
@@ -517,13 +574,9 @@ void Container::store_file(const std::string &in_path) {
 
     fat.push_back(entry);
   }
-
-  store_fat(); // Store the updated FAT to the container.
 }
 
 void Container::load_file(const std::string &out_path) {
-  load_fat(); // Load the stored FAT to memory for reading.
-
   // Attempt to get the FAT entry for the output path. Will fatal if unresolved.
   const FATEntry &entry = get_entry(out_path);
 

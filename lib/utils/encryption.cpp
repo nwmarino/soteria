@@ -14,6 +14,7 @@
 #include "cli/cli.h"
 #include "utils/encryption.h"
 #include "utils/file.h"
+#include <iostream>
 
 namespace fs = boost::filesystem;
 
@@ -134,28 +135,35 @@ soteria::aes_decrypt(const std::vector<unsigned char> &data,
   }
 
   /// Initialize plaintext buffer to read into.
-  std::vector<unsigned char> plaintext(data.size());
-  int len = 0, plaintext_len = 0;
+  int len = 0;
+  int decrypted_len = 0;
+  std::vector<unsigned char> decrypted_data(data.size() + EVP_MAX_BLOCK_LENGTH);
 
   // Attempt to decrypt data.
-  if (!EVP_DecryptUpdate(ctx, plaintext.data(), &len, 
+  if (!EVP_DecryptUpdate(ctx, decrypted_data.data(), &len, 
       data.data(), data.size())) {
     EVP_CIPHER_CTX_free(ctx);
     cli::fatal("[aes_decrypt] update failed");
   }
-  plaintext_len = len;
+  decrypted_len = len;
 
   // Attempt to finalize decryption.
-  if (!EVP_DecryptFinal_ex(ctx, plaintext.data() + len, &len)) {
+  if (!EVP_DecryptFinal_ex(ctx, decrypted_data.data() + len, &len)) {
+    unsigned long err_code = ERR_get_error();
+    std::cerr << "Decryption failed with error code: " << err_code << std::endl;
+    // You can also print out a human-readable error message
+    char err_buff[120];
+    ERR_error_string_n(err_code, err_buff, sizeof(err_buff));
+    std::cerr << "OpenSSL error: " << err_buff << std::endl;
     EVP_CIPHER_CTX_free(ctx);
     cli::fatal("[aes_decrypt] finalization failed");
   }
-  plaintext_len += len;
+  decrypted_len += len;
 
   // Resize plaintext buffer to actual read size.
-  plaintext.resize(plaintext_len);
+  decrypted_data.resize(decrypted_len);
   EVP_CIPHER_CTX_free(ctx);
-  return plaintext;
+  return decrypted_data;
 }
 
 std::vector<unsigned char> 
