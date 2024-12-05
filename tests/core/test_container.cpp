@@ -1,6 +1,5 @@
 #include "boost/filesystem/operations.hpp"
 #include "catch2/catch_test_macros.hpp"
-#include "catch2/generators/catch_generators.hpp"
 
 #include "../../include/core/container.h"
 
@@ -9,13 +8,11 @@ namespace fs = boost::filesystem;
 using namespace soteria;
 
 TEST_CASE("Container Creation", "[container]") {
-  int SIZE = GENERATE(1024, 2048, 4096);
-
-  Container *container_c = Container::create("test", "password", SIZE);
+  Container *container_c = Container::create("test", "password");
   delete container_c;
 
   REQUIRE(fs::exists("test"));
-  REQUIRE(fs::file_size("test") == SIZE);
+  REQUIRE(fs::file_size("test") == 2048);
   fs::remove("test");
 }
 
@@ -61,17 +58,19 @@ TEST_CASE("Container Empty FAT persistence", "[container]") {
 }
 
 TEST_CASE("Container file storing", "[container]") {
-  Container *container = Container::create("test", "password", 1024);
+  Container *container = Container::create("test", "password");
 
   std::ofstream file("test_file");
   REQUIRE(fs::exists("test_file"));
   file << "test";
+  file.close();
   container->store_file("test_file");
+
+  delete container;
   fs::remove("test_file");
 
   // One block size since the file is 4 bytes, 12 byte padding.
-  REQUIRE(fs::file_size("test") == 1024);
-  delete container;
+  REQUIRE(fs::file_size("test") == 2048 + 16);
   fs::remove("test");
 }
 
@@ -139,7 +138,7 @@ TEST_CASE("Empty Container File Deletion", "[container]") {
 }
 
 TEST_CASE("Large Container File Deletion", "[container]") {
-  Container *container = Container::create("test", "password", 1024);
+  Container *container = Container::create("test", "password");
   REQUIRE(container->get_fat().empty());
 
   std::ofstream input_file1("test_file1");
@@ -162,5 +161,51 @@ TEST_CASE("Large Container File Deletion", "[container]") {
   REQUIRE(!container->get_fat().empty());
 
   delete container;
+  fs::remove("test");
+}
+
+TEST_CASE("Container Compaction", "[container]") {
+  Container *container = Container::create("test", "password");
+  REQUIRE(fs::exists("test"));
+  
+  // Create two test files.
+  std::ofstream input_file1("test_file1");
+  REQUIRE(fs::exists("test_file1"));
+  input_file1 << "test1";
+  input_file1.close();
+  std::ofstream input_file2("test_file2");
+  REQUIRE(fs::exists("test_file2"));
+  input_file2 << "test2";
+  input_file2.close();
+
+  // Store the test files to the container, and remove them from the local tree.
+  container->store_file("test_file1");
+  container->store_file("test_file2");
+  fs::remove("test_file1");
+  fs::remove("test_file2");
+
+  // Delete the first file from the container.
+  REQUIRE(container->delete_file("test_file1"));
+  REQUIRE(!container->get_fat().empty());
+
+  // Compact the container.
+  container->compact();
+  REQUIRE(!container->get_fat().empty());
+  delete container;
+
+  // Check that the container is the correct size. 2048 + 4 + 12 (padding).
+  REQUIRE(fs::file_size("test") == 2048 + 16);
+  fs::remove("test");
+}
+
+/// Check that compacting an empty container does not compact the reserved space.
+TEST_CASE("Empty Container Compaction", "[container]") {
+  Container *container = Container::create("test", "password");
+  REQUIRE(fs::exists("test"));
+  REQUIRE(container->get_fat().empty());
+
+  container->compact();
+  delete container;
+  REQUIRE(fs::file_size("test") == 2048);
   fs::remove("test");
 }

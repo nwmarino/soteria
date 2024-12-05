@@ -34,6 +34,9 @@ using namespace soteria;
 /// Default number of iterations to use for PBKDF2.
 constexpr std::size_t PBKDF2_ITERATIONS = 100000;
 
+/// Default chunk size for container compaction.
+constexpr std::size_t CHUNK_SIZE = 1024 * 128; // 128 KB
+
 /// Byte-widths.
 constexpr std::size_t WIDTH_VERSION = 4;
 constexpr std::size_t WIDTH_SIZE = 8;
@@ -102,8 +105,7 @@ Container::Container(const std::string &path,
 
 Container::Container(const std::string &name, 
                      const std::string &path,
-                     const std::string &pass,
-                     std::size_t size) : name(name), path(path) {
+                     const std::string &pass) : name(name), path(path) {
   // Create the new container.
   container.open(
     this->path,
@@ -151,7 +153,7 @@ Container::Container(const std::string &name,
   store_master(); // Clears salt, master from memory.
 
   // Write the remaining reserved space as empty.
-  std::vector<unsigned char> empty_space(size - container.tellp(), 0);
+  std::vector<unsigned char> empty_space(2048 - container.tellp(), 0);
   if (!container.write(
     reinterpret_cast<const char *>(empty_space.data()), 
     empty_space.size()
@@ -174,13 +176,11 @@ Container::~Container() {
 }
 
 Container *Container::create(const std::string &path,
-                             const std::string &pass,
-                             std::size_t size) { 
+                             const std::string &pass) { 
   return new Container(
     path.substr(path.find_last_of('/') + 1), 
     path,
-    pass,
-    size
+    pass
   );
 }
 
@@ -497,6 +497,63 @@ void Container::list(const std::string &path) {
   }
 
   output.close();
+}
+
+void Container::compact() {
+  if (fat.empty())
+    return;
+
+  // Create a temporary container file to read compacted data into.
+  const std::string tmp_file = this->path + ".tmp";
+  std::ofstream tmp_container(tmp_file, std::ios::binary | std::ios::out);
+  if (!tmp_container || !tmp_container.is_open())
+    cli::fatal("[compact] failed to create temporary container: " + name);
+
+  // Reserve space in the new container.
+  tmp_container.seekp(2048 - 1, std::ios::beg);
+  tmp_container.write("", 1);
+
+  // For each FAT entry, write its data in chunks to the new container.
+  std::streampos new_offset = 2048;
+  for (FATEntry &entry : this->fat) {
+    // Instantiate a buffer to read file data in chunks.
+    std::vector<unsigned char> buffer(CHUNK_SIZE);
+    container.seekg(entry.offset, std::ios::beg);
+    std::size_t remaining = entry.encrypted_size;
+    std::streampos new_entry_offset = new_offset;
+
+    // Repeat until all data is read.
+    while (remaining > 0) {
+      std::size_t to_read = std::min(CHUNK_SIZE, remaining);
+      container.read(reinterpret_cast<char *>(buffer.data()), to_read);
+      if (container.gcount() != to_read)
+        cli::fatal("[compact] failed to read data from container.");
+
+      if (!tmp_container.write(reinterpret_cast<char *>(buffer.data()), to_read))
+        cli::fatal("[compact] failed to write data to temporary container.");
+
+      remaining -= to_read;
+      new_offset += to_read;
+    }
+
+    // Update the file's FAT entry offset.
+    entry.offset = new_entry_offset;
+  }
+
+  // Close the temporary file.
+  container.close();
+  tmp_container.close();
+
+  if (!fs::remove(path.c_str()))
+    cli::fatal("[compact] failed to remove original container file.");
+
+  fs::rename(tmp_file, path);
+
+  // Reopen the container file.
+  container.open(
+    path,
+    std::ios::binary | std::ios::in | std::ios::out
+  );
 }
 
 bool Container::contains(const std::string &name) const {

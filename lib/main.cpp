@@ -73,6 +73,9 @@ int main(int argc, char **argv) {
 
   }
 
+  if (opts.doCompact)
+    container->compact();
+
   delete container;
   return EXIT_SUCCESS;
 }

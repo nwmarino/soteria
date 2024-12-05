@@ -20,8 +20,8 @@ public:
     Make = 0,
     Remove,
     Store,
-    Delete,
     Load,
+    Delete,
     List,
     Log,
   };
@@ -33,6 +33,7 @@ public:
     Cmd command;
     std::vector<std::string> paths;
     bool printVersion : 1;
+    bool doCompact : 1;
   };
 
   /// \returns A struct of parsed CLI arguments.

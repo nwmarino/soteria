@@ -56,8 +56,7 @@ class Container {
   /// \param size The size of the container.
   Container(const std::string &name, 
             const std::string &path,
-            const std::string &pass,
-            std::size_t size);
+            const std::string &pass);
 
   /// Writes the version to the container.
   void store_version();
@@ -78,8 +77,7 @@ public:
   /// \param path The path to the container.
   /// \param size The size of the container.
   static Container *create(const std::string &path, 
-                           const std::string &pass, 
-                           std::size_t size = 2048);
+                           const std::string &pass);
 
   /// \returns A pre-existing container representation.
   /// \param path The path to the container.
@@ -113,6 +111,9 @@ public:
   /// Dumps the container's contents to \p path.
   /// \param path The path to dump the container to.
   void list(const std::string &path);
+
+  /// Compacts the container file by overwriting empty space.
+  void compact();
 
   /// \returns The FAT of this container.
   const std::vector<FATEntry> &get_fat() const { return fat; };

@@ -61,6 +61,10 @@ using namespace soteria;
       "delete files from the container"
     )
     (
+      "compact,c",
+      "compact the container file"
+    )
+    (
       "log", 
       "log the container audit log to a file"
     )
@@ -137,6 +141,9 @@ using namespace soteria;
       opts.paths = vmap["delete"].as<std::vector<std::string>>();
     }
 
+    if (vmap.count("compact"))
+      opts.doCompact = true;
+
     if (vmap.count("list")) {
       command_count++;
       opts.command = Cmd::List;
@@ -152,13 +159,14 @@ using namespace soteria;
       opts.printVersion = true;
     
     // Check that a command was given.
-    if (command_count == 0 && !vmap.count("container")) {
+    if (command_count == 0 && !opts.printVersion && !vmap.count("container") 
+        && !opts.doCompact) {
       cli::fatal("[cli] no container specified");
     } else if (command_count > 1) { // Check only one command was given.
       cli::fatal("[cli] multiple commands specified");
     } else if ((opts.command != Cmd::Make && opts.command != Cmd::Remove) 
         && !vmap.count("container")) { // Check a container path was given.
-      cli::fatal("[cli] no container specified");
+      cli::fatal("[cli] no container path specified");
     }
   } catch (const bpo::error &ex) {
     std::cerr << "[cli] argument parsing error: " << ex.what() << std::endl;
