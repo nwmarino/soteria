@@ -86,10 +86,9 @@
     },
     "cmake.debugConfig": {
         "args": [
-            "--pw",
-            "hey",
             "C",
-            "-c"
+            "--pw",
+            "123",
         ]
     }
 }
