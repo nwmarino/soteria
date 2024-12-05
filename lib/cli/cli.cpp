@@ -1,15 +1,18 @@
 //>==- cli.cpp ------------------------------------------------------------==<//
 //
+// The following source implements the command line interface for the program.
+//
 //>==----------------------------------------------------------------------==<//
 
-#include <boost/program_options/options_description.hpp>
-#include <boost/program_options/positional_options.hpp>
 #include <cstdlib>
 #include <iostream>
 #include <string>
 #include <vector>
 
-#include "boost/program_options.hpp"
+#include "boost/program_options/options_description.hpp"
+#include "boost/program_options/parsers.hpp"
+#include "boost/program_options/positional_options.hpp"
+#include "boost/program_options/variables_map.hpp"
 
 #include "../../include/cli/cli.h"
 
@@ -18,6 +21,7 @@ namespace bpo = boost::program_options;
 using namespace soteria;
 
 [[nodiscard]] cli::CLIOpts cli::parse(int argc, char **argv) {
+  // Define the command line options.
   CLIOpts opts;
   bpo::options_description desc("Options");
   desc.add_options()
@@ -58,6 +62,7 @@ using namespace soteria;
       "log the container audit log to a file"
     );
 
+  // Add a positional option for the container path.
   bpo::options_description positional_desc("Positional options:");
   positional_desc.add_options()
     (
@@ -65,10 +70,10 @@ using namespace soteria;
       bpo::value<std::string>(&opts.container),
       "path to the container"
     );
-  
   bpo::positional_options_description positional;
   positional.add("container", 1);
 
+  // Parse the command line arguments.
   bpo::variables_map vmap;
   try {
     bpo::store(
@@ -88,11 +93,11 @@ using namespace soteria;
 
     // Enforce password requirement
     if (!vmap.count("password"))
-      cli::fatal("err: password must be specified with -pw or --password");
+      cli::fatal("[cli] password must be specified with --pw or --password");
 
     opts.password = vmap["password"].as<std::string>();
 
-    // Ensure only one operation is given.
+    // To ensure only one operation is given.
     unsigned int command_count = 0;
 
     if (vmap.count("make")) {
@@ -128,20 +133,20 @@ using namespace soteria;
       opts.command = Cmd::Log;
     }
     
-    if (command_count == 0) {
-      if (!vmap.count("container"))
-        cli::fatal("err: no container specified");
+    // Check that a command was given.
+    if (command_count == 0 && !vmap.count("container")) {
+      cli::fatal("[cli] no container specified");
+    } else if (command_count > 1) { // Check only one command was given.
+      cli::fatal("[cli] multiple commands specified");
+    } else if ((opts.command != Cmd::Make && opts.command != Cmd::Remove) 
+        && !vmap.count("container")) { // Check a container path was given.
+      cli::fatal("[cli] no container specified");
     }
-    else if (command_count > 1)
-      cli::fatal("err: multiple commands specified");
-    else if ((opts.command != Cmd::Make && opts.command != Cmd::Remove) && !vmap.count("container"))
-      cli::fatal("err: no container specified");
-
-  } catch (const bpo::error& ex) {
-    std::cerr << "argument parsing error: " << ex.what() << std::endl;
+  } catch (const bpo::error &ex) {
+    std::cerr << "[cli] argument parsing error: " << ex.what() << std::endl;
     std::cout << desc << std::endl;
     exit(EXIT_FAILURE);
-  } catch (const std::runtime_error& ex) {
+  } catch (const std::runtime_error &ex) {
     std::cerr << ex.what() << std::endl;
     std::cout << desc << std::endl;
     exit(EXIT_FAILURE);
@@ -152,5 +157,5 @@ using namespace soteria;
 
 [[noreturn]] void cli::fatal(const std::string &m) {
   std::cerr << m << std::endl;
-  std::exit(1);
+  std::exit(EXIT_FAILURE);
 }

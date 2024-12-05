@@ -1,5 +1,8 @@
 //>==- cli.h --------------------------------------------------------------==<//
 //
+// This header file declares a CLI interface to parse command line arguments
+// and raise errors with.
+//
 //>==----------------------------------------------------------------------==<//
 
 #ifndef SOTERIA_CLI_H
@@ -10,7 +13,6 @@
 
 namespace soteria {
 
-/// A CLI parser and interface.
 class cli {
 public:
   /// Possible execution commands.
@@ -37,7 +39,6 @@ public:
   [[nodiscard]] static CLIOpts parse(int argc, char **argv);
 
   /// Quits the program with an error message \p m.
-  /// \param m The error message.
   [[noreturn]] static void fatal(const std::string &m);
 };
 

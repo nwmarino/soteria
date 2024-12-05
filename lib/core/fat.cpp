@@ -1,13 +1,10 @@
 //>==- fat.cpp ------------------------------------------------------------==<//
 //
+// This file implements functions to serialize and deserialize FAT entries.
+//
 //>==----------------------------------------------------------------------==<//
 
-#include <iostream>
-#include <istream>
-#include <openssl/aes.h>
-#include <sstream>
-
-#include "boost/filesystem.hpp"
+#include "boost/filesystem/operations.hpp"
 
 #include "../../include/cli/cli.h"
 #include "../../include/core/fat.h"
@@ -19,7 +16,7 @@ using namespace soteria;
 
 FATEntry soteria::get_metadata(const std::string &file_path) {
   if (!fs::exists(file_path))
-    cli::fatal("file does not exist: " + file_path);
+    cli::fatal("[fat_get_metadata] file does not exist: " + file_path);
 
   // Construct a new FAT entry given the file.
   FATEntry entry;
@@ -33,11 +30,11 @@ FATEntry soteria::get_metadata(const std::string &file_path) {
 }
 
 void soteria::serialize(std::ostringstream &stream, const FATEntry &entry) {
-  std::string padded_filename = entry.filename;
-  if (padded_filename.size() > 32)
-    cli::fatal("filename too long: " + entry.filename);
+  if (entry.filename.size() > 32)
+    cli::fatal("[fat_serialize] filename too long: " + entry.filename);
 
-  // Write the padded filename.
+  // Create a filename padded to 32 bytes, and write it.
+  std::string padded_filename = entry.filename;
   padded_filename.resize(32, '\0');
   stream.write(padded_filename.data(), 32);
   
@@ -62,7 +59,7 @@ void soteria::serialize(std::ostringstream &stream, const FATEntry &entry) {
   );
 
   // Write the last modified timestamp.
-  std::int64_t last_modified_time = static_cast<std::int64_t>(entry.last_modified);
+  int64_t last_modified_time = static_cast<int64_t>(entry.last_modified);
   stream.write(
     reinterpret_cast<const char *>(&last_modified_time), 
     sizeof(last_modified_time)
@@ -111,12 +108,12 @@ bool soteria::deserialize(std::istringstream &stream, FATEntry &entry) {
     );
 
     // Read in the last modified timestamp.
-    std::uint64_t last_modified;
+    uint64_t last_modified;
     stream.read(
       reinterpret_cast<char *>(&last_modified), 
       sizeof(last_modified)
     );
-    entry.last_modified = static_cast<std::time_t>(last_modified);
+    entry.last_modified = static_cast<time_t>(last_modified);
 
     // Read in the IV, checksum.
     stream.read(

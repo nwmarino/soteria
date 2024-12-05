@@ -1,30 +1,19 @@
 //>==- main.cpp -----------------------------------------------------------==<//
 //
+// The following source drives the CLI interface and container operations.
+//
 //>==----------------------------------------------------------------------==<//
 
-#include <cstring>
 #include <string>
 
-#include "boost/filesystem.hpp"
+#include "boost/filesystem/operations.hpp"
 
 #include "../include/cli/cli.h"
 #include "../include/core/container.h"
-#include "../include/utils/encryption.h"
 
 namespace fs = boost::filesystem;
 
 using namespace soteria;
-
-/// Skips to the next command line argument.
-/// \param argc The number of arguments.
-/// \param argv The argument vector.s
-static void nextArg(int *argc, char ***argv) {
-  if (*argc == 0)
-    cli::fatal("missing argument");
-
-  (*argc)--;
-  (*argv)++;
-}
 
 int main(int argc, char **argv) {
   cli::CLIOpts opts = cli::parse(argc, argv);
@@ -38,7 +27,7 @@ int main(int argc, char **argv) {
     return EXIT_SUCCESS;
   } else if (opts.command == cli::Cmd::Remove) {
     if (!fs::exists(opts.container))
-      cli::fatal("container does not exist");
+      cli::fatal("[soteria] container does not exist: " + opts.container);
 
     fs::remove(opts.container.c_str());
     return EXIT_SUCCESS;
@@ -60,7 +49,9 @@ int main(int argc, char **argv) {
   }
 
   if (opts.command == cli::Cmd::List) {
-    container->list("./list.txt");
+    container->list(opts.container.substr(
+      opts.container.find_last_of('/') + 1) + "_ls.txt"
+    );
   }
 
   if (opts.command == cli::Cmd::Log) {

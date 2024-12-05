@@ -1,5 +1,9 @@
 //>==- container.h --------------------------------------------------------==<//
 //
+// This header declares the container class, which represents a container file
+// instance. The container class is responsible for managing the container file
+// and its contents.
+//
 //>==----------------------------------------------------------------------==<//
 
 #ifndef SOTERIA_CONTAINER_H
@@ -14,7 +18,6 @@
 
 namespace soteria {
 
-/// Represents a container file instance.
 class Container {
   /// The name of the container.
   const std::string name;
@@ -53,6 +56,12 @@ class Container {
             const std::string &pass,
             std::size_t size);
 
+  /// Writes the current master hash to the container.
+  void store_master();
+
+  /// Loads the master hash from the container.
+  void load_master();
+
 public:
   ~Container();
 
@@ -67,17 +76,17 @@ public:
   /// \param path The path to the container.
   static Container *open(const std::string &path, const std::string &pass);
 
-  /// Writes the current master hash to the container.
-  void store_master();
-
-  /// Loads the master hash from the container.
-  void load_master();
-
   /// Writes the current state of the FAT to the container.
   void store_fat();
 
   /// Loads the current state of the FAT from the container.
   void load_fat();
+
+  /// \returns `true` if this container contains a file with name \p name.
+  bool contains(const std::string &name) const;
+
+  /// \returns The FAT entry for the file with the name \p name.
+  FATEntry &get_entry(const std::string &name) const;
 
   /// Stores a file to the container.
   /// \param in_path The path to the file to write.
@@ -91,7 +100,7 @@ public:
   /// \param path The path to dump the container to.
   void list(const std::string &path);
 
-  /// \returns The FAT of the container.
+  /// \returns The FAT of this container.
   const std::vector<FATEntry> &get_fat() const { return fat; };
 };
 
