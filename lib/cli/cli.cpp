@@ -155,6 +155,9 @@ using namespace soteria;
   return opts;
 }
 
+void cli::info(const std::string &m) noexcept
+{ std::cerr << m << std::endl; }
+
 [[noreturn]] void cli::fatal(const std::string &m) {
   std::cerr << m << std::endl;
   std::exit(EXIT_FAILURE);

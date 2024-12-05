@@ -485,6 +485,12 @@ void Container::load_file(const std::string &out_path) {
     );
   }
 
+  // Compare the checksum.
+  if (compute_checksum(out_path) != entry.checksum)
+    cli::fatal("[load_file] checksum mismatch: " + out_path);
+  else
+    cli::info("[load_file] " + out_path + " checksum matches!");
+
   // Create the decrypted file at the output path.
   bin_write_file(out_path, file_data);
 }

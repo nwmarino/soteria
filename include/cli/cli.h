@@ -38,6 +38,9 @@ public:
   /// \param argv The argument vector.
   [[nodiscard]] static CLIOpts parse(int argc, char **argv);
 
+  /// Prints the informative message \p m.
+  static void info(const std::string &m) noexcept;
+
   /// Quits the program with an error message \p m.
   [[noreturn]] static void fatal(const std::string &m);
 };
