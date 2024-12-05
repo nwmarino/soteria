@@ -106,6 +106,9 @@ Container::Container(const std::string &path,
 Container::Container(const std::string &name, 
                      const std::string &path,
                      const std::string &pass) : name(name), path(path) {
+  if (fs::exists(this->path))
+    cli::fatal("[container] already exists: " + name);
+
   // Create the new container.
   container.open(
     this->path,
