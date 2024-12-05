@@ -11,7 +11,7 @@ include(FetchContent)
 FetchContent_Declare(
   catch2
   GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-  GIT_TAG v3.4.0 # Replace with the desired version
+  GIT_TAG v3.4.0
 )
 
 FetchContent_MakeAvailable(catch2)
@@ -55,7 +55,7 @@ target_link_libraries(soteria
 # Testing
 #
 
-file(GLOB TEST_SOURCES tests/utils/*.cpp)
+file(GLOB TEST_SOURCES tests/core/*.cpp tests/utils/*.cpp)
 add_executable(soteria_tests ${TEST_SOURCES} lib/cli/cli.cpp)
 
 target_link_libraries(soteria_tests

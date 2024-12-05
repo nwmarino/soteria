@@ -90,6 +90,9 @@ public:
   /// Dumps the container's contents to \p path.
   /// \param path The path to dump the container to.
   void list(const std::string &path);
+
+  /// \returns The FAT of the container.
+  const std::vector<FATEntry> &get_fat() const { return fat; };
 };
 
 } // end namespace soteria
