@@ -114,15 +114,53 @@ TEST_CASE("Container file deletion", "[container]") {
   input_file << "test";
   input_file.close();
 
-  container_o->store_file("test_file");
+  REQUIRE_NOTHROW(container_o->store_file("test_file"));
   fs::remove("test_file");
   REQUIRE(!container_o->get_fat().empty());
 
-  container_o->delete_file("test_file");
+  REQUIRE(container_o->delete_file("test_file"));
 
   REQUIRE(!fs::exists("test_file"));
   REQUIRE(container_o->get_fat().empty());
 
   delete container_o;
+  fs::remove("test");
+}
+
+TEST_CASE("Empty Container File Deletion", "[container]") {
+  Container *container = Container::create("test", "password");
+  REQUIRE(container->get_fat().empty());
+
+  REQUIRE(!container->delete_file("test_file"));
+  REQUIRE(container->get_fat().empty());
+
+  delete container;
+  fs::remove("test");
+}
+
+TEST_CASE("Large Container File Deletion", "[container]") {
+  Container *container = Container::create("test", "password", 1024);
+  REQUIRE(container->get_fat().empty());
+
+  std::ofstream input_file1("test_file1");
+  REQUIRE(fs::exists("test_file1"));
+  input_file1 << "test1";
+  input_file1.close();
+
+  std::ofstream input_file2("test_file2");
+  REQUIRE(fs::exists("test_file2"));
+  input_file2 << "test1";
+  input_file2.close();
+
+  container->store_file("test_file1");
+  container->store_file("test_file2");
+  fs::remove("test_file1");
+  fs::remove("test_file2");
+  REQUIRE(!container->get_fat().empty());
+
+  REQUIRE(container->delete_file("test_file2"));
+  REQUIRE(!container->get_fat().empty());
+
+  delete container;
   fs::remove("test");
 }

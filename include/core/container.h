@@ -108,7 +108,7 @@ public:
   /// Attempts to delete file at \p path from the container and the FAT.
   /// \param path The path to the file to delete.
   /// \returns `true` if the deletion was successful.
-  bool delete_file(const std::string &path); 
+  bool delete_file(const std::string &path);
 
   /// Dumps the container's contents to \p path.
   /// \param path The path to dump the container to.
