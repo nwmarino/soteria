@@ -11,9 +11,9 @@
 #include "openssl/rand.h"
 #include "openssl/sha.h"
 
-#include "../../include/cli/cli.h"
-#include "../../include/utils/encryption.h"
-#include "../../include/utils/file.h"
+#include "cli/cli.h"
+#include "utils/encryption.h"
+#include "utils/file.h"
 
 namespace fs = boost::filesystem;
 

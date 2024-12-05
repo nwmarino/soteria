@@ -8,8 +8,9 @@
 
 #include "boost/filesystem/operations.hpp"
 
-#include "../include/cli/cli.h"
-#include "../include/core/container.h"
+#include "include/core/version.h"
+#include "cli/cli.h"
+#include "core/container.h"
 
 namespace fs = boost::filesystem;
 
@@ -17,6 +18,13 @@ using namespace soteria;
 
 int main(int argc, char **argv) {
   cli::CLIOpts opts = cli::parse(argc, argv);
+
+  if (opts.printVersion) {
+    cli::info("[soteria] version " 
+        + std::to_string(VERSION_MAJOR) + "." 
+        + std::to_string(VERSION_MINOR)
+    );
+  }
 
   if (opts.command == cli::Cmd::Make) {
     Container *container = Container::create(

@@ -31,6 +31,7 @@ public:
     std::string password;
     Cmd command;
     std::vector<std::string> paths;
+    bool printVersion : 1;
   };
 
   /// \returns A struct of parsed CLI arguments.

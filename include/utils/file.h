@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-#include "../cli/cli.h"
+#include "cli/cli.h"
 
 namespace soteria {
 

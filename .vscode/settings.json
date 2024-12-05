@@ -81,7 +81,8 @@
         "complex": "cpp",
         "typeindex": "cpp",
         "regex": "cpp",
-        "future": "cpp"
+        "future": "cpp",
+        "*.in": "cpp"
     },
     "cmake.debugConfig": {
         "args": [

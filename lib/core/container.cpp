@@ -9,22 +9,17 @@
 #include <cstdint>
 #include <iomanip>
 #include <iostream>
-#include <string>
-#include <vector>
 
-#include "boost/filesystem.hpp"
+#include "boost/filesystem/operations.hpp"
 #include "boost/iostreams/filtering_stream.hpp"
 #include "boost/iostreams/filter/zlib.hpp"
+#include "openssl/evp.h"
 
-#include "openssl/aes.h"
-#include "openssl/rand.h"
-#include "openssl/sha.h"
-
-#include "../../include/cli/cli.h"
-#include "../../include/core/container.h"
-#include "../../include/core/fat.h"
-#include "../../include/utils/encryption.h"
-#include "../../include/utils/file.h"
+#include "cli/cli.h"
+#include "core/container.h"
+#include "core/fat.h"
+#include "utils/encryption.h"
+#include "utils/file.h"
 
 namespace fs = boost::filesystem;
 namespace ios = boost::iostreams;

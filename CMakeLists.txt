@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.20.0)
 set(CMAKE_CXX_STANDARD 20)
-project(soteria)
+project(soteria VERSION 1.0)
+configure_file(include/core/version.h.in include/core/version.h)
 
 cmake_policy(SET CMP0167 NEW)
 find_package(Boost REQUIRED COMPONENTS filesystem program_options iostreams)
@@ -23,17 +24,17 @@ add_subdirectory(lib)
 
 target_include_directories(soteria_cli
     PUBLIC
-        ${INCLUDE_DIR}/cli
+        ${INCLUDE_DIR}
 )
 
 target_include_directories(soteria_core
     PUBLIC
-        ${INCLUDE_DIR}/core
+        ${INCLUDE_DIR}
 )
 
 target_include_directories(soteria_utils
     PUBLIC
-        ${INCLUDE_DIR}/utils
+        ${INCLUDE_DIR}
 )
 
 add_executable(soteria lib/main.cpp)
@@ -49,6 +50,12 @@ target_link_libraries(soteria
         soteria_cli
         soteria_core
         soteria_utils
+)
+
+target_include_directories(soteria
+    PUBLIC
+        "${PROJECT_BINARY_DIR}"
+        ${INCLUDE_DIR}
 )
 
 # 

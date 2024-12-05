@@ -6,15 +6,13 @@
 
 #include <cstdlib>
 #include <iostream>
-#include <string>
-#include <vector>
 
 #include "boost/program_options/options_description.hpp"
 #include "boost/program_options/parsers.hpp"
 #include "boost/program_options/positional_options.hpp"
 #include "boost/program_options/variables_map.hpp"
 
-#include "../../include/cli/cli.h"
+#include "cli/cli.h"
 
 namespace bpo = boost::program_options;
 
@@ -60,6 +58,10 @@ using namespace soteria;
     (
       "log", 
       "log the container audit log to a file"
+    )
+    (
+      "version,v", 
+      "print the version of the program"
     );
 
   // Add a positional option for the container path.
@@ -132,6 +134,10 @@ using namespace soteria;
       command_count++;
       opts.command = Cmd::Log;
     }
+
+    // Don't increment command count for version.
+    if (vmap.count("version"))
+      opts.printVersion = true;
     
     // Check that a command was given.
     if (command_count == 0 && !vmap.count("container")) {

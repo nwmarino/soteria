@@ -6,9 +6,9 @@
 
 #include "boost/filesystem/operations.hpp"
 
-#include "../../include/cli/cli.h"
-#include "../../include/core/fat.h"
-#include "../../include/utils/encryption.h"
+#include "cli/cli.h"
+#include "core/fat.h"
+#include "utils/encryption.h"
 
 namespace fs = boost::filesystem;
 
