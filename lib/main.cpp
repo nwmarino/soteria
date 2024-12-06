@@ -69,10 +69,6 @@ int main(int argc, char **argv) {
     );
   }
 
-  if (opts.command == cli::Cmd::Log) {
-
-  }
-
   if (opts.doCompact)
     container->compact();
 

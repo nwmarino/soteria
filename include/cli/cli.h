@@ -23,7 +23,6 @@ public:
     Load,
     Delete,
     List,
-    Log,
   };
 
   /// Represents parsed CLI arguments.

@@ -65,10 +65,6 @@ using namespace soteria;
       "compact the container file"
     )
     (
-      "log", 
-      "log the container audit log to a file"
-    )
-    (
       "version,v", 
       "print the version of the program"
     );
@@ -147,11 +143,6 @@ using namespace soteria;
     if (vmap.count("list")) {
       command_count++;
       opts.command = Cmd::List;
-    }
-
-    if (vmap.count("log")) {
-      command_count++;
-      opts.command = Cmd::Log;
     }
 
     // Don't increment command count for version.
