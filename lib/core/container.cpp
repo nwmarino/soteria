@@ -37,6 +37,21 @@ constexpr std::size_t PBKDF2_ITERATIONS = 100000;
 /// Default chunk size for container compaction.
 constexpr std::size_t CHUNK_SIZE = 1024 * 128; // 128 KB
 
+/// Container layout:
+///
+/// [reserved space : 32768 bytes = 32KB]
+/// [files : ...]
+///
+/// Reserved space layout:
+///
+/// 0  | [version : 4]
+/// 4  | [master salt : 16]
+/// 20 | [master hash : 32]
+/// 52 | [FAT IV : 16]
+/// 68 | [FAT size : 8]
+/// 76 | [FAT entries : -32692]
+constexpr std::size_t RESERVED_SPACE = 32768;
+
 /// Byte-widths.
 constexpr std::size_t WIDTH_VERSION = 4;
 constexpr std::size_t WIDTH_SIZE = 8;
@@ -156,7 +171,7 @@ Container::Container(const std::string &name,
   store_master(); // Clears salt, master from memory.
 
   // Write the remaining reserved space as empty.
-  std::vector<unsigned char> empty_space(2048 - container.tellp(), 0);
+  std::vector<unsigned char> empty_space(RESERVED_SPACE - container.tellp(), 0);
   if (!container.write(
     reinterpret_cast<const char *>(empty_space.data()), 
     empty_space.size()
@@ -513,11 +528,11 @@ void Container::compact() {
     cli::fatal("[compact] failed to create temporary container: " + name);
 
   // Reserve space in the new container.
-  tmp_container.seekp(2048 - 1, std::ios::beg);
+  tmp_container.seekp(RESERVED_SPACE - 1, std::ios::beg);
   tmp_container.write("", 1);
 
   // For each FAT entry, write its data in chunks to the new container.
-  std::streampos new_offset = 2048;
+  std::streampos new_offset = RESERVED_SPACE;
   for (FATEntry &entry : this->fat) {
     // Instantiate a buffer to read file data in chunks.
     std::vector<unsigned char> buffer(CHUNK_SIZE);

@@ -12,7 +12,7 @@ TEST_CASE("Container Creation", "[container]") {
   delete container_c;
 
   REQUIRE(fs::exists("test"));
-  REQUIRE(fs::file_size("test") == 2048);
+  REQUIRE(fs::file_size("test") == 32768);
   fs::remove("test");
 }
 
@@ -70,7 +70,7 @@ TEST_CASE("Container file storing", "[container]") {
   fs::remove("test_file");
 
   // One block size since the file is 4 bytes, 12 byte padding.
-  REQUIRE(fs::file_size("test") == 2048 + 16);
+  REQUIRE(fs::file_size("test") == 32768 + 16);
   fs::remove("test");
 }
 
@@ -185,8 +185,8 @@ TEST_CASE("Container Compaction", "[container]") {
   fs::remove("test_file2");
   delete container;
 
-  // Check that the container is the correct size. 2048 + 2 * (5 + 11 (padding)).
-  REQUIRE(fs::file_size("test") == 2048 + (16 * 2));
+  // Check that the container is the correct size. 32768 + 2 * (5 + 11 (padding)).
+  REQUIRE(fs::file_size("test") == 32768 + (16 * 2));
 
   Container *container_o = Container::open("test", "password");
 
@@ -194,7 +194,7 @@ TEST_CASE("Container Compaction", "[container]") {
   REQUIRE(container_o->delete_file("test_file1"));
 
   // Check that the container size has not changed.
-  REQUIRE(fs::file_size("test") == 2048 + (16 * 2));
+  REQUIRE(fs::file_size("test") == 32768 + (16 * 2));
   REQUIRE(!container_o->get_fat().empty());
 
   // Compact the container.
@@ -202,8 +202,8 @@ TEST_CASE("Container Compaction", "[container]") {
   REQUIRE(!container_o->get_fat().empty());
   delete container_o;
 
-  // Check that the container is the correct size. 2048 + 5 + 11 (padding).
-  REQUIRE(fs::file_size("test") == 2048 + 16);
+  // Check that the container is the correct size. 32768 + 5 + 11 (padding).
+  REQUIRE(fs::file_size("test") == 32768 + 16);
   fs::remove("test");
 }
 
@@ -215,6 +215,6 @@ TEST_CASE("Empty Container Compaction", "[container]") {
 
   container->compact();
   delete container;
-  REQUIRE(fs::file_size("test") == 2048);
+  REQUIRE(fs::file_size("test") == 32768);
   fs::remove("test");
 }
